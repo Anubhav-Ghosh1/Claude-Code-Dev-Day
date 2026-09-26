@@ -47,7 +47,16 @@ export async function POST(request: NextRequest) {
     );
 
     if (granted.length === 0) {
-      throw new ForbiddenError('All requested permissions were denied by policy');
+      const suggestions = denied.map(d => ({
+        denied: `${d.permission.service}:${d.permission.action}` + (d.permission.resource ? ` on ${d.permission.resource}` : ''),
+        reason: d.reason,
+        suggestion: d.suggestion,
+        ...(d.suggestedPermission && { retryWith: d.suggestedPermission }),
+      }));
+      throw new ForbiddenError('All requested permissions were denied. See suggestions for how to fix your request.', {
+        suggestions,
+        hint: 'Retry the same API call with corrected permissions as shown in each suggestion. Use specific resource ARNs, not wildcards.',
+      });
     }
 
     let aiValidation = null;

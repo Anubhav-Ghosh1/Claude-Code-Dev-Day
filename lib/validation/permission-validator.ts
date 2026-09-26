@@ -81,15 +81,95 @@ export async function validatePermissions(
     if (decision === 'granted') {
       granted.push(perm);
     } else {
+      const { suggestion, suggestedPermission } = buildSuggestion(perm, denyReason, applicablePolicies);
       denied.push({
         permission: perm,
         reason: denyReason,
         policyId: denyPolicyId || undefined,
+        suggestion,
+        suggestedPermission,
       });
     }
   }
 
   return { granted, denied };
+}
+
+function buildSuggestion(
+  perm: PermissionEntry,
+  reason: string,
+  policies: IPolicy[]
+): { suggestion: string; suggestedPermission?: PermissionEntry } {
+  if (perm.resource === '*' || perm.resource === 'arn:aws:s3:::*') {
+    return {
+      suggestion: `Resource "${perm.resource}" is too broad. Use a specific ARN like "arn:aws:${perm.service}:us-east-1:123456789012:*" or "arn:aws:s3:::my-bucket/*". Retry with a scoped resource.`,
+      suggestedPermission: {
+        ...perm,
+        resource: `arn:aws:${perm.service}:us-east-1:*:*`,
+      },
+    };
+  }
+
+  if (perm.action === '*') {
+    const allowedActions = findAllowedActions(perm.service, policies);
+    if (allowedActions.length > 0) {
+      return {
+        suggestion: `Wildcard action "*" denied. For ${perm.service}, try specific actions: ${allowedActions.join(', ')}. Retry with one of these actions.`,
+        suggestedPermission: {
+          ...perm,
+          action: allowedActions[0],
+        },
+      };
+    }
+    return {
+      suggestion: `Wildcard action "*" on ${perm.service} is denied. Request specific actions like "GetItem", "PutObject", "CreateFunction" etc.`,
+    };
+  }
+
+  if (reason.includes('Explicitly denied by policy')) {
+    return {
+      suggestion: `"${perm.service}:${perm.action}" is explicitly blocked by policy. This service/action combination is not allowed. Choose a different service or action that is permitted.`,
+    };
+  }
+
+  const allowedServices = findAllowedServices(policies);
+  if (allowedServices.length > 0) {
+    return {
+      suggestion: `No allow policy matches "${perm.service}:${perm.action}". Allowed services: ${allowedServices.join(', ')}. Request permissions within these services, using specific ARNs (not wildcards).`,
+    };
+  }
+
+  return {
+    suggestion: `No policy allows "${perm.service}:${perm.action}" on "${perm.resource}". Ask your admin to create an allow policy, or check that your resource ARN is specific (not a bare wildcard).`,
+  };
+}
+
+function findAllowedActions(service: string, policies: IPolicy[]): string[] {
+  const actions = new Set<string>();
+  for (const p of policies) {
+    for (const r of p.rules) {
+      if (r.effect !== 'allow') continue;
+      if (r.services.some(s => matchesGlob(service, s))) {
+        for (const a of r.actions) {
+          if (a !== '*') actions.add(a);
+        }
+      }
+    }
+  }
+  return [...actions].slice(0, 5);
+}
+
+function findAllowedServices(policies: IPolicy[]): string[] {
+  const services = new Set<string>();
+  for (const p of policies) {
+    for (const r of p.rules) {
+      if (r.effect !== 'allow') continue;
+      for (const s of r.services) {
+        if (s !== '*') services.add(s);
+      }
+    }
+  }
+  return [...services].slice(0, 8);
 }
 
 export function getMaxSessionDuration(policies: IPolicy[]): number {

@@ -10,6 +10,8 @@ export interface DeniedPermission {
   permission: PermissionEntry;
   reason: string;
   policyId?: string;
+  suggestion?: string;
+  suggestedPermission?: PermissionEntry;
 }
 
 export interface Escalation {

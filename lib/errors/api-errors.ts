@@ -31,8 +31,8 @@ export class UnauthorizedError extends ApiError {
 }
 
 export class ForbiddenError extends ApiError {
-  constructor(message = 'Insufficient permissions') {
-    super(403, 'FORBIDDEN', message);
+  constructor(message = 'Insufficient permissions', details?: Record<string, unknown>) {
+    super(403, 'FORBIDDEN', message, details);
   }
 }
 

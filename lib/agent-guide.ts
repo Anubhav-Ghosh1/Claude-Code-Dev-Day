@@ -120,15 +120,11 @@ export function claudeMd(baseUrl: string, agent: Agent, sample: PermissionEntry,
   - Never print the key, commit it, or write it to a file.
   - If it isn't set, stop and ask the user to set it. Don't search for it elsewhere.`;
 
-  return `# AgentVault: cloud access for this repo
+  return `# AgentVault: AWS credentials for AI agents
 
-The AI agent working in this repo is registered in AgentVault as **${md(agent.name)}** (\`${agent.agentId}\`)${
-    agent.description ? ` — ${md(agent.description)}` : ""
-  }.
+This file contains everything you need to get **temporary, scoped AWS credentials** (access key, secret key, session token) for implementing any AWS flow. You request credentials from AgentVault by describing your task and the permissions you need. AgentVault validates, issues time-bound credentials, and logs everything.
 
-You never get AWS keys directly. You open a session with AgentVault, declare what you need to do, and
-AgentVault issues scoped, time-bound credentials — only for the permissions the session allows.
-Close the session when you're done.
+**Agent:** ${md(agent.name)} (\`${agent.agentId}\`)${agent.description ? ` — ${md(agent.description)}` : ""}
 
 ## Setup
 
@@ -136,111 +132,193 @@ Close the session when you're done.
 ${keySection}
 - **Tools:** \`curl\` and \`jq\`.
 
-## Rules
+## How it works
 
-1. **All AWS access goes through AgentVault.** Don't use the AWS CLI, SDKs, or any AWS keys you find.
-2. **Ask only for what the task needs.** Use specific actions (\`GetObject\`, not \`*\`) and specific resource ARNs.
-3. **Describe the task honestly** in \`gist\`. It is reviewed (including by Claude) and written to the audit log.
-4. **A denial is final.** Don't retry the same request or find a workaround. Tell the user what was denied and why.
-5. **Need more access mid-task?** Use escalate with a clear reason. At most 3 escalations per session.
-6. **Always complete the session** when you finish, even if the task failed, with a one-line summary.
-7. **Everything is logged.** Every request, AWS call, denial and completion is recorded in a tamper-evident log.
+1. You call AgentVault's session API with your task description and needed permissions
+2. AgentVault checks policies, validates intent, and issues scoped AWS credentials
+3. You export the credentials as environment variables (\`AWS_ACCESS_KEY_ID\`, \`AWS_SECRET_ACCESS_KEY\`, \`AWS_SESSION_TOKEN\`)
+4. You use the AWS CLI or SDK with those credentials to perform your task
+5. When done, you complete the session — credentials are revoked
 
-## 1. Open a session for the task
+## Step 1: Request AWS credentials
 
 \`\`\`bash
 ${c.request}
 \`\`\`
 
-The full response is printed to stderr. \`SESSION_ID\` is captured automatically.
+### Extract and export the AWS credentials
 
-**Check the response before proceeding:**
-- \`grantedPermissions\` — what you can do
-- \`deniedPermissions\` — if something you need was denied, **stop and tell the user**
-- \`overPrivilegeFlags\` — AgentVault flagged you asked for more than needed. Narrow your request next time.
-- \`credentials\` — scoped AWS credentials (if using direct AWS access mode)
-- \`ttl.expiresAt\` — when credentials expire. Plan your work to finish before this.
-
-## 2. Make AWS calls through AgentVault
+After the session is created, extract the credentials from the response and export them:
 
 \`\`\`bash
-${c.awsCall}
+export AWS_ACCESS_KEY_ID=$(echo "$RESPONSE" | jq -r '.data.credentials.accessKeyId')
+export AWS_SECRET_ACCESS_KEY=$(echo "$RESPONSE" | jq -r '.data.credentials.secretAccessKey')
+export AWS_SESSION_TOKEN=$(echo "$RESPONSE" | jq -r '.data.credentials.sessionToken')
+export AWS_DEFAULT_REGION=$(echo "$RESPONSE" | jq -r '.data.credentials.region')
 \`\`\`
 
-\`service\` and \`action\` use AWS names; \`params\` are the normal AWS API parameters for that action.
-Calls outside the session's granted permissions are rejected with 403.
+Or in a single call that captures and exports:
 
-## 3. Ask for more access (only if needed)
+\`\`\`bash
+RESPONSE=$(curl -s -X POST "${baseUrl}/api/v1/sessions" \\
+${hasKey ? `  -H "X-API-Key: ${embeddedKey}" \\` : '  -H "X-API-Key: $AGENTVAULT_API_KEY" \\'}
+  -H "Content-Type: application/json" \\
+  -d '{ "gist": "YOUR TASK DESCRIPTION", "permissions": [YOUR_PERMISSIONS], "estimatedDuration": 900 }')
+
+SESSION_ID=$(echo "$RESPONSE" | jq -r '.data.sessionId')
+export AWS_ACCESS_KEY_ID=$(echo "$RESPONSE" | jq -r '.data.credentials.accessKeyId')
+export AWS_SECRET_ACCESS_KEY=$(echo "$RESPONSE" | jq -r '.data.credentials.secretAccessKey')
+export AWS_SESSION_TOKEN=$(echo "$RESPONSE" | jq -r '.data.credentials.sessionToken')
+export AWS_DEFAULT_REGION=$(echo "$RESPONSE" | jq -r '.data.credentials.region')
+\`\`\`
+
+Now you can use \`aws s3\`, \`aws dynamodb\`, \`aws lambda\`, etc. with these credentials.
+
+## Step 2: Use the credentials
+
+Once exported, use standard AWS CLI or SDK calls:
+
+\`\`\`bash
+# S3 example
+aws s3 cp s3://my-bucket/file.txt ./file.txt
+
+# DynamoDB example
+aws dynamodb get-item --table-name my-table --key '{"id": {"S": "123"}}'
+
+# Lambda example
+aws lambda invoke --function-name my-function output.json
+\`\`\`
+
+## Step 3: Escalate if needed
 
 \`\`\`bash
 ${c.escalate}
 \`\`\`
 
-Old credentials are revoked, new ones issued with combined permissions.
+Old credentials are revoked, new ones issued with combined permissions. Re-export the new credentials.
 
-## 4. Finish — always
+## Step 4: Complete the session (always)
 
 \`\`\`bash
 ${c.complete}
 \`\`\`
 
-## Tips for requesting credentials
+**Always complete the session** when done — even if the task failed. Include a summary of what happened.
 
-### Be specific with permissions
-Bad: \`{ "service": "s3", "action": "*", "resource": "*" }\`
-Good: \`{ "service": "s3", "action": "GetObject", "resource": "arn:aws:s3:::my-bucket/reports/*" }\`
+## How to request permissions
 
-### Common permission patterns
-
-| Task | Service | Action | Resource pattern |
-|---|---|---|---|
-| Read from S3 | s3 | GetObject | \`arn:aws:s3:::bucket-name/path/*\` |
-| Write to S3 | s3 | PutObject | \`arn:aws:s3:::bucket-name/path/*\` |
-| Read DynamoDB | dynamodb | GetItem, Query | \`arn:aws:dynamodb:*:*:table/table-name\` |
-| Write DynamoDB | dynamodb | PutItem | \`arn:aws:dynamodb:*:*:table/table-name\` |
-| Deploy Lambda | lambda | CreateFunction, UpdateFunctionCode | \`arn:aws:lambda:*:*:function:func-name\` |
-| Read logs | logs | FilterLogEvents, GetLogEvents | \`arn:aws:logs:*:*:log-group:*\` |
-
-### Handling credential expiry
-- Sessions have a TTL (default 1 hour, max 12 hours). Check \`ttl.expiresAt\` in the session response.
-- If your task takes longer, set \`estimatedDuration\` appropriately when opening the session.
-- If credentials expire mid-task, open a new session with the remaining work described in \`gist\`.
-
-### When permissions are denied
-1. Check the \`deniedPermissions\` array — it tells you exactly what was blocked and why.
-2. If it's a policy denial, the admin needs to update policies. Tell the user.
-3. If it's an over-privilege flag, narrow your request to only what's needed.
-4. Never try to work around denials — they exist for security.
-
-### Multiple operations in one session
-- Open **one session** for a logical task, not one per AWS call.
-- Request all permissions you'll need upfront.
-- If you discover you need more mid-task, use escalate (max 3 times per session).
-
-## Permission format
+### Permission format
 
 \`\`\`json
 { "service": "s3", "action": "GetObject", "resource": "arn:aws:s3:::bucket-name/path/*" }
 \`\`\`
 
-- \`resource\` must be a full ARN. A bare \`*\` is rejected.
-- \`estimatedDuration\` is in seconds (60 to 43200). A session lasts at most 1 hour.
+**Important rules for permissions:**
+- \`resource\` must be a **specific ARN** — bare wildcards (\`*\`) are rejected
+- Use specific actions (\`GetObject\`, \`PutItem\`) not wildcards (\`*\`)
+- \`estimatedDuration\` is in seconds (60 to 43200)
+
+### Common permission patterns
+
+| Task | Service | Action | Resource |
+|---|---|---|---|
+| Download from S3 | s3 | GetObject | \`arn:aws:s3:::bucket-name/path/*\` |
+| List S3 bucket | s3 | ListBucket | \`arn:aws:s3:::bucket-name\` |
+| Upload to S3 | s3 | PutObject | \`arn:aws:s3:::bucket-name/path/*\` |
+| Read DynamoDB | dynamodb | GetItem | \`arn:aws:dynamodb:us-east-1:*:table/table-name\` |
+| Query DynamoDB | dynamodb | Query | \`arn:aws:dynamodb:us-east-1:*:table/table-name\` |
+| Write DynamoDB | dynamodb | PutItem | \`arn:aws:dynamodb:us-east-1:*:table/table-name\` |
+| Deploy Lambda | lambda | UpdateFunctionCode | \`arn:aws:lambda:us-east-1:*:function:func-name\` |
+| Invoke Lambda | lambda | InvokeFunction | \`arn:aws:lambda:us-east-1:*:function:func-name\` |
+| Read CloudWatch Logs | logs | GetLogEvents | \`arn:aws:logs:us-east-1:*:log-group:group-name\` |
+
+### Example: Download files from S3
+
+\`\`\`bash
+RESPONSE=$(curl -s -X POST "${baseUrl}/api/v1/sessions" \\
+${hasKey ? `  -H "X-API-Key: ${embeddedKey}" \\` : '  -H "X-API-Key: $AGENTVAULT_API_KEY" \\'}
+  -H "Content-Type: application/json" \\
+  -d '{
+    "gist": "Download report files from S3 bucket",
+    "permissions": [
+      { "service": "s3", "action": "GetObject", "resource": "arn:aws:s3:::demo-bucket/*" },
+      { "service": "s3", "action": "ListBucket", "resource": "arn:aws:s3:::demo-bucket" }
+    ],
+    "estimatedDuration": 900
+  }')
+
+SESSION_ID=$(echo "$RESPONSE" | jq -r '.data.sessionId')
+export AWS_ACCESS_KEY_ID=$(echo "$RESPONSE" | jq -r '.data.credentials.accessKeyId')
+export AWS_SECRET_ACCESS_KEY=$(echo "$RESPONSE" | jq -r '.data.credentials.secretAccessKey')
+export AWS_SESSION_TOKEN=$(echo "$RESPONSE" | jq -r '.data.credentials.sessionToken')
+export AWS_DEFAULT_REGION=$(echo "$RESPONSE" | jq -r '.data.credentials.region')
+
+# Now use AWS CLI
+aws s3 ls s3://demo-bucket/
+aws s3 cp s3://demo-bucket/report.csv ./report.csv
+
+# Complete session when done
+curl -s -X POST "${baseUrl}/api/v1/sessions/$SESSION_ID/complete" \\
+${hasKey ? `  -H "X-API-Key: ${embeddedKey}" \\` : '  -H "X-API-Key: $AGENTVAULT_API_KEY" \\'}
+  -H "Content-Type: application/json" \\
+  -d '{"summary": "Downloaded report.csv from S3"}'
+\`\`\`
+
+## Handling denials — auto-retry
+
+If your request is denied, the API response includes a \`suggestions\` field that tells you exactly how to fix it.
+
+**When you get a 403 error with denied permissions:**
+1. Read \`details.suggestions\` in the error response
+2. Each suggestion has a \`retryWith\` field containing a corrected permission object
+3. **Retry the same API call** with the corrected permissions from the suggestions
+4. If the suggestion says a service is explicitly blocked (e.g., IAM), do not retry — tell the user
+
+Example denied response:
+\`\`\`json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "All requested permissions were denied",
+    "details": {
+      "suggestions": [
+        {
+          "denied": "s3:GetObject on *",
+          "reason": "No matching allow policy found",
+          "suggestion": "Resource \\"*\\" is too broad. Use arn:aws:s3:::my-bucket/*",
+          "retryWith": { "service": "s3", "action": "GetObject", "resource": "arn:aws:s3:::my-bucket/*" }
+        }
+      ],
+      "hint": "Retry with corrected permissions as shown in each suggestion"
+    }
+  }
+}
+\`\`\`
+
+**Auto-retry procedure:**
+1. Parse the \`retryWith\` objects from the suggestions
+2. Rebuild your permissions array using the suggested corrections
+3. Call the session API again with the corrected permissions
+4. If denied again with no suggestions, stop and tell the user
+
+## Rules
+
+1. **All AWS access goes through AgentVault.** Get credentials from AgentVault, use them with AWS CLI/SDK.
+2. **Use specific actions and ARNs.** Never use wildcard \`*\` for actions or resources.
+3. **Describe the task honestly** in \`gist\`. It is logged and reviewed.
+4. **Auto-retry on denial.** If denied, check the \`suggestions\` field and retry with corrected permissions.
+5. **If explicitly blocked** (e.g., IAM, STS, Organizations), do not retry — tell the user.
+6. **Always complete the session** when finished, even on failure.
+7. **Everything is logged.** Every request is recorded in a tamper-evident audit trail.
 
 ## Errors
 
 | Status | Meaning | What to do |
 |---|---|---|
 | 400 | Invalid request (bad ARN or params) | Fix the request and retry |
-| 401 | Missing or wrong AgentVault key | ${hasKey ? "Check the key in this file is still valid" : "Ask the user to check \\`AGENTVAULT_API_KEY\\`"} |
-| 403 | Not allowed: outside session scope, agent suspended, or policy denial | Escalate with a reason, or stop and tell the user |
-| 409 | Session no longer active (completed, expired or revoked) | Open a new session |
-| 429 | Rate limit: too many requests or active sessions | Complete open sessions, then retry |
-
-## Troubleshooting
-
-- **"No active session"** — You tried to call AWS without opening a session first. Run step 1.
-- **"Session expired"** — TTL exceeded. Open a new session for remaining work.
-- **"All permissions denied"** — No matching allow policy. Ask the user/admin to create one.
-- **"Agent suspended"** — This agent has been disabled. Ask the user to check the AgentVault dashboard.
+| 401 | Missing or wrong API key | ${hasKey ? "Check the key in this file is still valid" : "Ask the user to check \\`AGENTVAULT_API_KEY\\`"} |
+| 403 | Denied — check \`details.suggestions\` for how to fix | Auto-retry with corrected permissions from suggestions |
+| 409 | Session no longer active | Open a new session |
+| 429 | Rate limit exceeded | Complete open sessions, then retry |
 `;
 }

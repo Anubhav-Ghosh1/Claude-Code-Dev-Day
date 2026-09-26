@@ -96,7 +96,7 @@
 - [ ] Session tag-based STS revocation for emergencies
 - [ ] Seed script for default policies (`scripts/seed-policies.ts`)
 - [ ] Audit chain verification CLI (`scripts/verify-audit-chain.ts`)
-- [ ] Docker setup + deployment docs
+- [ ] Vercel deployment config
 - [ ] Unit tests (models, permission validator, hash chain, ARN validator, policy builder)
 - [ ] Integration tests (full session lifecycle with mocked STS)
 - [ ] API endpoint tests (happy path + error cases + auth failures + rate limiting)
@@ -110,8 +110,14 @@
 
 ---
 
+## Documentation
+- [x] `DEMO_FLOW.md` — Full demo walkthrough: register agent, create policy, request session, escalate, complete, audit
+- [x] `AWS_SETUP.md` — IAM setup guide: broker role, target role, trust policies, Vercel config
+- [x] `sample-agent-task.md` — Example task spec file that an AI agent (Claude Code) reads and executes
+
 ## File Count
-- **42 TypeScript files** (excluding node_modules, .next)
+- **43 TypeScript files** (excluding node_modules, .next)
 - **10 API route handlers** covering 13 endpoints
 - **5 MongoDB models** + 1 counter model
+- **3 documentation files** (demo flow, AWS setup, sample task)
 - **0 TypeScript errors**

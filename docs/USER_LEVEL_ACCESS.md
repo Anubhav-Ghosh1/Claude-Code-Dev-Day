@@ -118,6 +118,10 @@ token in the OS keychain (not a plain file) and sends it with each request. Clau
 
 ## Other backend issues found during the frontend audit (not fixed; frontend-only change)
 
+0. **Critical — anyone can register as admin.** `POST /api/v1/auth/register` is public and accepts
+   `role: "admin" | "auditor" | "viewer"` from the request body. The sign-in page no longer sends a role, but a direct
+   request still can. The API must ignore `role` on self-registration (always `viewer`), or registration should be
+   admin-only/invite-only.
 1. **`POST /api/v1/agents` has no authentication.** Anyone can register an agent and get a working API key. It needs
    `requireDashboardAuth('agents:create')`.
 2. **Read endpoints are public.** `GET /api/v1/sessions`, `/sessions/:id`, `/audit-logs`, `/audit-logs/export`,

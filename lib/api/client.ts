@@ -6,6 +6,8 @@ import type {
   AuditLogFilters,
   AuditLogsResponse,
   CreatePolicyInput,
+  CreateSessionInput,
+  DashboardSessionResult,
   Policy,
   RegisterAgentInput,
   RegisterAgentResult,
@@ -43,6 +45,8 @@ export const api = {
   getSession: (id: string) => http<ApiResponse<SessionDetail>>(`/sessions/${id}`),
   revokeSession: (id: string, reason?: string) =>
     http<ApiResponse<Session>>(`/sessions/${id}/revoke`, { method: "POST", body: JSON.stringify({ reason }) }),
+  createSession: (input: CreateSessionInput) =>
+    http<ApiResponse<DashboardSessionResult>>(`/sessions/dashboard-create`, { method: "POST", body: JSON.stringify(input) }),
 
   listAuditLogs: (f: AuditLogFilters = {}) => http<AuditLogsResponse>(`/audit-logs${qs(f)}`),
   auditExportUrl: (format: "csv" | "json") => `/api/v1/audit-logs/export${qs({ format })}`,

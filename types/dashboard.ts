@@ -203,6 +203,31 @@ export interface Policy {
   updatedAt: string;
 }
 
+export interface CreateSessionInput {
+  agentId: string;
+  gist: string;
+  permissions: PermissionEntry[];
+  estimatedDuration: number;
+}
+
+export interface DashboardSessionResult {
+  sessionId: string;
+  status: string;
+  credentials: {
+    accessKeyId: string;
+    secretAccessKey: string;
+    sessionToken: string;
+    expiration: string;
+    region: string;
+  };
+  grantedPermissions: PermissionEntry[];
+  deniedPermissions: DeniedPermission[];
+  overPrivilegeFlags: OverPrivilegeFlag[];
+  aiValidation?: AiValidation;
+  _mock?: boolean;
+  ttl: { issuedAt: string; expiresAt: string; durationSeconds: number };
+}
+
 export interface CreatePolicyInput {
   name: string;
   description?: string;

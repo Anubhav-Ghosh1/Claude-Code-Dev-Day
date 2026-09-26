@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import type { SessionStatus } from "@/types/dashboard";
 import { useAgents, useSessions } from "@/hooks/use-api";
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
 import { ErrorState } from "@/components/shared/empty-state";
 import { SessionsTable } from "@/components/sessions/sessions-table";
+import { CreateSessionDialog } from "@/components/sessions/create-session-dialog";
 import { fmtNum } from "@/lib/utils";
 
 const LIMIT = 20;
@@ -19,9 +20,10 @@ export default function SessionsPage() {
   const [agentId, setAgentId] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
-  const { data, error, isLoading } = useSessions({ status: status || undefined, agentId: agentId || undefined, search: deferredSearch, page, limit: LIMIT });
+  const { data, error, isLoading, mutate } = useSessions({ status: status || undefined, agentId: agentId || undefined, search: deferredSearch, page, limit: LIMIT });
   const { data: agents } = useAgents();
   const names = useMemo(() => new Map(agents?.map((a) => [a.agentId, a.name])), [agents]);
   const pg = data?.pagination;
@@ -33,7 +35,15 @@ export default function SessionsPage() {
 
   return (
     <>
-      <PageHeader title="Sessions" description="One session per task: what the agent asked for, what it was granted, and how long its token lived." />
+      <PageHeader
+        title="Sessions"
+        description="One session per task: what the agent asked for, what it was granted, and how long its token lived."
+        actions={
+          <Button variant="primary" onClick={() => setCreateOpen(true)}>
+            <Plus size={15} /> Create session
+          </Button>
+        }
+      />
       <Card>
         <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
           <div className="relative w-72">
@@ -74,6 +84,13 @@ export default function SessionsPage() {
           </div>
         )}
       </Card>
+
+      <CreateSessionDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        agents={agents ?? []}
+        onCreated={() => mutate()}
+      />
     </>
   );
 }

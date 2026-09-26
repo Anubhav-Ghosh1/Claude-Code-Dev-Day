@@ -132,6 +132,18 @@ export interface ISession extends Document {
     reason: string;
     severity: 'info' | 'warning' | 'critical';
   }>;
+  aiValidation?: {
+    approved: boolean;
+    reasoning: string;
+    flaggedPermissions: Array<{
+      permission: { service: string; action: string; resource: string; effect: 'Allow' | 'Deny' };
+      concern: string;
+      severity: 'low' | 'medium' | 'high';
+    }>;
+    suggestedPermissions?: Array<{ service: string; action: string; resource: string; effect: 'Allow' | 'Deny' }>;
+    confidenceScore: number;
+    model: string;
+  };
   completedAt?: Date;
   revokedAt?: Date;
   revocationReason?: string;
@@ -170,6 +182,7 @@ const SessionSchema = new Schema<ISession>(
     usageCount: { type: Number, default: 0 },
     overPrivilegeScore: { type: Number, min: 0, max: 1 },
     overPrivilegeFlags: [OverPrivilegeFlagSchema],
+    aiValidation: Schema.Types.Mixed,
     completedAt: Date,
     revokedAt: Date,
     revocationReason: String,

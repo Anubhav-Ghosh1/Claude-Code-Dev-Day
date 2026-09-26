@@ -1,6 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { PermissionEntry } from '@/types/models';
 
+export const AI_MODEL = 'claude-sonnet-5';
+
 export interface AIValidationResult {
   approved: boolean;
   reasoning: string;
@@ -35,7 +37,7 @@ export async function validateWithAI(
     .join('\n');
 
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-5',
+    model: AI_MODEL,
     max_tokens: 1024,
     messages: [
       {
@@ -122,6 +124,19 @@ Rules:
       flaggedPermissions: [],
       confidenceScore: 0,
     };
+  }
+}
+
+/** Like validateWithAI, but returns null instead of throwing (bad key, outage, timeout). */
+export async function tryValidateWithAI(
+  gist: string,
+  permissions: PermissionEntry[]
+): Promise<AIValidationResult | null> {
+  try {
+    return await validateWithAI(gist, permissions);
+  } catch (err) {
+    console.warn('AI validation unavailable, continuing with policy decision only:', err instanceof Error ? err.message : err);
+    return null;
   }
 }
 

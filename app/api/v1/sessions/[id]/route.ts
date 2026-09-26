@@ -4,6 +4,7 @@ import { Session } from '@/lib/db/models/session.model';
 import { AuditLog } from '@/lib/db/models/audit-log.model';
 import { successResponse, errorResponse } from '@/lib/utils/response';
 import { NotFoundError } from '@/lib/errors/api-errors';
+import { expireStaleSessions } from '@/lib/sessions/expire-stale';
 
 export async function GET(
   _request: NextRequest,
@@ -12,6 +13,7 @@ export async function GET(
   try {
     await connectDB();
     const { id } = await params;
+    await expireStaleSessions();
 
     const session = await Session.findOne({ sessionId: id }).select('-__v');
     if (!session) throw new NotFoundError('Session', id);

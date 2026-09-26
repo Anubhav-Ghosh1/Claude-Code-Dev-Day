@@ -72,29 +72,46 @@
 
 ### Other
 - [x] `middleware.ts` — Route matcher (pass-through for now, NextAuth enforcement in Phase 5)
+- [x] Mock STS (`USE_MOCK_STS=true`) and Claude AI validation (`ENABLE_AI_VALIDATION=true`)
+
+### Phase 5: Dashboard (Frontend) — on real API
+- [x] Dashboard shell — sidebar (live active-session count), topbar with live audit-chain ribbon (`app/dashboard/layout.tsx`)
+- [x] UI primitives (hand-rolled, Tailwind v4): Card, Button, Dialog (native), Tabs, Segmented, Field, Skeleton (`components/ui/`)
+- [x] Overview analytics — 5 KPI cards w/ sparklines, decisions over time, policy blocks vs Claude flags, decisions by service, risk histogram, top denied, agent leaderboard, live audit feed; every chart has a table view
+- [x] Sessions list — search/status/agent filters, live TTL bars, escalation + risk badges, pagination
+- [x] Session detail — 4 tabs (Overview w/ Claude's review + risk score, Permissions diff, Escalation timeline, Audit trail), Revoke with confirm, JSON export
+- [x] Audit log — chain integrity banner (+ jump to broken entry), filters, expandable rows w/ hash details, CSV/JSON export
+- [x] Agents — table, register dialog, one-time API key reveal, suspend/revoke
+- [x] Policies — read-only cards (rule chips, scope, constraints)
+- [x] SWR hooks with 3s polling (`hooks/use-api.ts`), typed client (`lib/api/client.ts`), wire types (`types/dashboard.ts`)
+- [x] Demo data seeder through the real API (`scripts/seed-demo.sh`)
+
+### Added for the dashboard (backend)
+- [x] `GET /api/v1/analytics?range=24h|7d|14d` (`lib/analytics/compute.ts`)
+- [x] `POST /api/v1/sessions/[id]/revoke`, `PATCH /api/v1/agents/[id]` (suspend/revoke; revoke kills active sessions)
+- [x] Lazy TTL expiry on read paths + agent auth (`lib/sessions/expire-stale.ts`)
+- [x] `GET /api/v1/agents` returns `activeSessions` / `totalSessions`; audit-logs `chainIntegrity` includes `brokenAt`, `headHash`
+- [x] Claude review persisted on the session (`aiValidation`); AI errors no longer fail session creation; `overprivilege.detected` logged
+
+### Fixes
+- [x] Audit logger: chain head never initialised on a fresh DB (every write retried, duplicated and 500'd) — now claims seq/head atomically before insert; verified with concurrent writes
+- [x] Audit log schema `minimize: false` — empty objects in `details` were stripped on save, breaking hash verification
 
 ---
 
 ## Next Steps
 
-### Phase 5: Dashboard (Frontend)
-- [ ] NextAuth setup (`lib/auth/next-auth-options.ts`, `app/api/auth/[...nextauth]/route.ts`, sign-in page)
-- [ ] Dashboard layout — sidebar, topbar, auth guard (`app/dashboard/layout.tsx`)
-- [ ] UI components (shadcn/ui-based: Button, Badge, Card, Dialog, DataTable, Tabs, etc.)
-- [ ] Overview page — stat cards (active sessions, today count, denied permissions, escalations), recent sessions table, critical alerts
-- [ ] Sessions list page — filterable table with TTL progress bars, permission counts, escalation badges
-- [ ] Session detail page — 4 tabs: Overview, Permissions (diff view), Escalations (timeline), Audit Trail
-- [ ] Audit log page — chain integrity banner, filterable table, expandable rows, export button
-- [ ] Policies page — table with rule builder slide-over editor
-- [ ] Agents page — table with register dialog + API key reveal (shown once)
-- [ ] React hooks: `usePolling`, `useSessions`, `useAuditLogs` (SWR-based)
+### Phase 5 leftovers
+- [ ] NextAuth setup + auth guard (dashboard and dashboard-only routes are currently open)
+- [ ] Policy editor (create/edit UI; API already exists)
+- [ ] Real `ANTHROPIC_API_KEY` in env — without it Claude review is skipped (policy-only decisions)
 
 ### Phase 6: Hardening
 - [ ] CORS configuration
 - [ ] Payload size limits
 - [ ] Request ID tracking across audit logs
 - [ ] Session tag-based STS revocation for emergencies
-- [ ] Seed script for default policies (`scripts/seed-policies.ts`)
+- [x] Seed script for default policies + demo agents/sessions (`scripts/seed-demo.sh`)
 - [ ] Audit chain verification CLI (`scripts/verify-audit-chain.ts`)
 - [ ] Docker setup + deployment docs
 - [ ] Unit tests (models, permission validator, hash chain, ARN validator, policy builder)
@@ -111,7 +128,7 @@
 ---
 
 ## File Count
-- **42 TypeScript files** (excluding node_modules, .next)
-- **10 API route handlers** covering 13 endpoints
+- **95 TypeScript files** (excluding node_modules, .next)
+- **13 API route handlers**
 - **5 MongoDB models** + 1 counter model
 - **0 TypeScript errors**

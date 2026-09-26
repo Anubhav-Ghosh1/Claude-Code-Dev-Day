@@ -51,10 +51,13 @@ export async function GET(request: NextRequest) {
 
     const response = paginatedResponse(logs, total, page, limit);
     const body = await response.json();
+    const head = await AuditLog.findOne().sort({ sequenceNumber: -1 }).select('hash sequenceNumber').lean();
     body.chainIntegrity = {
       verified: integrity.valid,
       lastVerifiedAt: integrity.lastVerifiedAt.toISOString(),
       totalEntries: integrity.totalChecked,
+      ...(integrity.brokenAt !== undefined && { brokenAt: integrity.brokenAt }),
+      ...(head && { headHash: head.hash, headSequence: head.sequenceNumber }),
     };
 
     return new Response(JSON.stringify(body), {

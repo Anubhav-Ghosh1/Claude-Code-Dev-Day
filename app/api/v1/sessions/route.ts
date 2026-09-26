@@ -6,7 +6,8 @@ import { Token } from '@/lib/db/models/token.model';
 import { authenticateAgent } from '@/lib/auth/api-key-auth';
 import { validatePermissions } from '@/lib/validation/permission-validator';
 import { detectOverPrivilege } from '@/lib/validation/over-privilege-detector';
-import { validateWithAI, isAIValidationEnabled } from '@/lib/validation/ai-validator';
+import { tryValidateWithAI, isAIValidationEnabled, AI_MODEL } from '@/lib/validation/ai-validator';
+import { expireStaleSessions } from '@/lib/sessions/expire-stale';
 import { issueCredentials, isMockMode } from '@/lib/aws/credential-broker';
 import { createSessionSchema } from '@/lib/validation/schemas';
 import { checkRateLimit } from '@/lib/rate-limit/limiter';
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     let aiValidation = null;
     if (isAIValidationEnabled()) {
-      aiValidation = await validateWithAI(parsed.data.gist, granted);
+      aiValidation = await tryValidateWithAI(parsed.data.gist, granted);
     }
 
     const { flags: overPrivilegeFlags, score: overPrivilegeScore } =
@@ -110,6 +111,7 @@ export async function POST(request: NextRequest) {
       ttl: { issuedAt: now, expiresAt },
       overPrivilegeScore,
       overPrivilegeFlags,
+      ...(aiValidation && { aiValidation: { ...aiValidation, model: AI_MODEL } }),
     });
 
     const auditEntries: Array<{
@@ -178,6 +180,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const aiFlags = aiValidation?.flaggedPermissions ?? [];
+    if (overPrivilegeFlags.length || aiFlags.length) {
+      const critical =
+        overPrivilegeFlags.some((f) => f.severity === 'critical') || aiFlags.some((f) => f.severity === 'high');
+      auditEntries.push({
+        actorType: 'system' as const,
+        actorId: 'system',
+        action: 'overprivilege.detected' as const,
+        severity: critical ? ('critical' as const) : ('warning' as const),
+        details: {
+          sessionId,
+          score: overPrivilegeScore,
+          ruleFlags: overPrivilegeFlags.map((f) => `${f.permission.service}:${f.permission.action}`),
+          aiFlags: aiFlags.map((f) => `${f.permission.service}:${f.permission.action}`),
+        },
+      });
+    }
+
     await writeSessionAuditLogs(sessionId, agent.agentId, auditEntries);
 
     return successResponse(
@@ -220,6 +240,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
+    await expireStaleSessions();
 
     const { searchParams } = new URL(request.url);
     const { page, limit, skip } = parsePagination({

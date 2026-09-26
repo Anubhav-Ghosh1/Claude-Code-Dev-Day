@@ -17,65 +17,63 @@ interface AuditEntry {
   userAgent?: string;
 }
 
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 10;
 
 export async function writeAuditLog(entry: AuditEntry): Promise<void> {
   await connectDB();
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      const counter = await Counter.findOneAndUpdate(
-        { name: 'audit_log' },
-        { $inc: { seq: 1 } },
-        { new: true, upsert: true }
-      );
+    // Read the current chain head (creating it on first use).
+    const head = await Counter.findOneAndUpdate(
+      { name: 'audit_log' },
+      { $setOnInsert: { seq: 0, currentHash: '' } },
+      { new: true, upsert: true }
+    );
 
-      const sequenceNumber = counter.seq;
-      const previousHash = counter.currentHash || computeGenesisHash();
-      const logId = `alog_${nanoid(24)}`;
-      const timestamp = new Date();
+    const sequenceNumber = head.seq + 1;
+    const previousHash = head.currentHash || computeGenesisHash();
+    const logId = `alog_${nanoid(24)}`;
+    const timestamp = new Date();
 
-      const hash = computeAuditHash({
-        previousHash,
-        logId,
-        sequenceNumber,
-        action: entry.action,
-        timestamp,
-        details: entry.details,
-      });
+    const hash = computeAuditHash({
+      previousHash,
+      logId,
+      sequenceNumber,
+      action: entry.action,
+      timestamp,
+      details: entry.details,
+    });
 
-      await AuditLog.create({
-        logId,
-        sequenceNumber,
-        sessionId: entry.sessionId,
-        agentId: entry.agentId,
-        actorType: entry.actorType,
-        actorId: entry.actorId,
-        action: entry.action,
-        severity: entry.severity,
-        details: entry.details,
-        previousHash,
-        hash,
-        timestamp,
-        sourceIp: entry.sourceIp,
-        userAgent: entry.userAgent,
-      });
+    // Claim the slot before inserting: only succeeds if no other writer advanced
+    // the chain since we read it, so the chain can never fork or duplicate.
+    const claimed = await Counter.findOneAndUpdate(
+      { name: 'audit_log', seq: head.seq, currentHash: head.currentHash },
+      { $set: { seq: sequenceNumber, currentHash: hash } }
+    );
 
-      // Update chain head with compare-and-swap
-      const updated = await Counter.updateOne(
-        { name: 'audit_log', currentHash: previousHash },
-        { $set: { currentHash: hash } }
-      );
-
-      if (updated.modifiedCount === 0) {
-        // Another write raced — retry
-        continue;
-      }
-
-      return;
-    } catch (err) {
-      if (attempt === MAX_RETRIES - 1) throw err;
+    if (!claimed) {
+      await new Promise((r) => setTimeout(r, 5 + Math.random() * 20 * (attempt + 1)));
+      continue;
     }
+
+    await AuditLog.create({
+      logId,
+      sequenceNumber,
+      sessionId: entry.sessionId,
+      agentId: entry.agentId,
+      actorType: entry.actorType,
+      actorId: entry.actorId,
+      action: entry.action,
+      severity: entry.severity,
+      details: entry.details,
+      previousHash,
+      hash,
+      timestamp,
+      sourceIp: entry.sourceIp,
+      userAgent: entry.userAgent,
+    });
+
+    return;
   }
 
   throw new Error('Failed to write audit log after maximum retries');

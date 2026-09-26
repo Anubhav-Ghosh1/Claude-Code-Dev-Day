@@ -4,6 +4,7 @@ import { Agent, IAgent } from '@/lib/db/models/agent.model';
 import { verifyApiKey, extractPrefix } from '@/lib/crypto/api-key-generator';
 import { UnauthorizedError, ForbiddenError, RateLimitError } from '@/lib/errors/api-errors';
 import { Session } from '@/lib/db/models/session.model';
+import { expireStaleSessions } from '@/lib/sessions/expire-stale';
 
 export interface AuthenticatedAgent {
   agent: IAgent;
@@ -28,7 +29,8 @@ export async function authenticateAgent(request: NextRequest): Promise<Authentic
     throw new ForbiddenError(`Agent is ${agent.status}`);
   }
 
-  // Check active sessions limit
+  // Check active sessions limit (expire stale ones first so they don't count)
+  await expireStaleSessions(true);
   const activeSessions = await Session.countDocuments({
     agentId: agent.agentId,
     status: 'active',

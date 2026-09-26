@@ -41,6 +41,7 @@ export function RegisterAgentDialog({ open, onClose, onRegistered }: { open: boo
         rateLimit: { maxRequestsPerMinute: form.rpm, maxActiveSessions: form.maxSessions },
       });
       setResult(res.data!);
+      try { sessionStorage.setItem(`avk_key_${res.data!.agentId}`, res.data!.apiKey); } catch {}
       onRegistered();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

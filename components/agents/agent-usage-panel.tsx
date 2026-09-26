@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Copy, Download, Eye, EyeOff, FileText, KeyRound, TriangleAlert } from "lucide-react";
 import type { Agent, Policy } from "@/types/dashboard";
 import { claudeMd, curlSnippets, samplePermission } from "@/lib/agent-guide";
@@ -19,6 +19,13 @@ export function AgentUsagePanel({ agent, policies }: { agent: Agent; policies?: 
   // Pasted key lives only in this component's memory: never stored, never sent to the server.
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(`avk_key_${agent.agentId}`);
+      if (stored) setApiKey(stored);
+    } catch {}
+  }, [agent.agentId]);
   const baseUrl = appUrl();
   const sample = samplePermission(policies);
   const keyOk = /^avk_(live|test)_[A-Za-z0-9]{8,}$/.test(apiKey.trim());

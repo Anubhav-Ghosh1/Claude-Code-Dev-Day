@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Pencil, Ban, RotateCcw, Search } from "lucide-react";
+import { Plus, Pencil, Ban, RotateCcw, Search, ShieldCheck } from "lucide-react";
 import { usePolicies } from "@/hooks/use-api";
 import type { Policy } from "@/types/dashboard";
 import { api } from "@/lib/api/client";
@@ -202,98 +202,135 @@ function PolicyCard({
         : "All agents";
 
   const disabled = p.status === "disabled";
+  const allowCount = p.rules.filter((r) => r.effect === "allow").length;
+  const denyCount = p.rules.filter((r) => r.effect === "deny").length;
+
+  const totalPerms = p.rules.reduce((sum, r) => sum + r.services.length * r.actions.length, 0);
 
   return (
-    <Card className={cn("animate-rise px-5 py-4", disabled && "opacity-60")} style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[14px] text-ink">{p.name}</span>
-            {disabled && (
-              <span className="rounded bg-muted/20 px-1.5 py-px text-[10px] font-medium uppercase text-muted">
-                disabled
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-[12.5px] text-muted">{p.description}</p>
-        </div>
-        <div className="flex shrink-0 items-start gap-2">
-          <div className="text-right font-mono text-[11px] text-muted">
+    <Card className={cn("animate-rise overflow-hidden", disabled && "opacity-50")} style={{ animationDelay: `${delay}ms` }}>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-2.5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-line-strong bg-raised">
+              <ShieldCheck size={15} className={disabled ? "text-muted" : "text-accent"} />
+            </span>
             <div>
-              priority <span className="text-ink-2">{p.priority}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[14px] font-semibold text-ink">{p.name}</span>
+                {disabled && (
+                  <span className="rounded-md bg-crit/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-[#e66767]">
+                    disabled
+                  </span>
+                )}
+              </div>
+              {p.description && <p className="mt-0.5 text-[12px] leading-snug text-muted">{p.description}</p>}
             </div>
-            <div>v{p.version}</div>
           </div>
-          <div className="flex gap-1">
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={onEdit}
+            className="cursor-pointer rounded-md p-1.5 text-muted transition-colors hover:bg-raised hover:text-ink"
+            title="Edit policy"
+          >
+            <Pencil size={14} />
+          </button>
+          {disabled ? (
             <button
-              onClick={onEdit}
-              className="cursor-pointer rounded p-1.5 text-muted hover:bg-raised hover:text-ink"
-              title="Edit"
+              onClick={onEnable}
+              className="cursor-pointer rounded-md p-1.5 text-muted transition-colors hover:bg-good/15 hover:text-good"
+              title="Re-enable"
             >
-              <Pencil size={13} />
+              <RotateCcw size={14} />
             </button>
-            {disabled ? (
-              <button
-                onClick={onEnable}
-                className="cursor-pointer rounded p-1.5 text-muted hover:bg-good/15 hover:text-good"
-                title="Re-enable"
-              >
-                <RotateCcw size={13} />
-              </button>
-            ) : (
-              <button
-                onClick={onDisable}
-                className="cursor-pointer rounded p-1.5 text-muted hover:bg-crit/15 hover:text-[#e66767]"
-                title="Disable"
-              >
-                <Ban size={13} />
-              </button>
-            )}
-          </div>
+          ) : (
+            <button
+              onClick={onDisable}
+              className="cursor-pointer rounded-md p-1.5 text-muted transition-colors hover:bg-crit/15 hover:text-[#e66767]"
+              title="Disable policy"
+            >
+              <Ban size={14} />
+            </button>
+          )}
         </div>
       </div>
-      <ul className="mt-4 space-y-2">
-        {p.rules.map((r, i) => (
-          <li key={i} className="flex items-start gap-3 rounded-md border border-line bg-page px-3 py-2">
-            <span
-              className={cn(
-                "mt-px rounded px-1.5 py-px font-mono text-[10.5px] font-medium uppercase",
-                r.effect === "deny" ? "bg-crit/15 text-[#e66767]" : "bg-good/15 text-good"
-              )}
-            >
-              {r.effect}
-            </span>
-            <div className="min-w-0 space-y-1 font-mono text-[11.5px]">
+
+      {/* Meta strip — compact row with all key info */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line bg-page/40 px-5 py-1.5 text-[11px]">
+        <span className="text-muted">P<span className="font-mono text-ink-2">{p.priority}</span></span>
+        <span className="text-line-strong">·</span>
+        <span className="text-muted">v<span className="font-mono text-ink-2">{p.version}</span></span>
+        <span className="text-line-strong">·</span>
+        {allowCount > 0 && <span className="font-mono text-good">{allowCount} allow</span>}
+        {allowCount > 0 && denyCount > 0 && <span className="text-line-strong">·</span>}
+        {denyCount > 0 && <span className="font-mono text-[#e66767]">{denyCount} deny</span>}
+        <span className="text-line-strong">·</span>
+        <span className="text-muted"><span className="font-mono text-ink-2">{totalPerms}</span> permissions</span>
+        <span className="ml-auto text-muted">{scope}</span>
+      </div>
+
+      {/* Rules */}
+      <div className="space-y-px border-t border-line">
+        {p.rules.map((r, i) => {
+          const permCount = r.services.length * r.actions.length;
+          return (
+            <div key={i} className="px-5 py-2.5">
+              <div className="mb-1.5 flex items-center gap-2">
+                <span
+                  className={cn(
+                    "rounded px-1.5 py-px font-mono text-[10px] font-semibold uppercase tracking-wider",
+                    r.effect === "deny"
+                      ? "bg-crit/15 text-[#e66767]"
+                      : "bg-good/15 text-good"
+                  )}
+                >
+                  {r.effect}
+                </span>
+                <span className="text-[10.5px] text-muted">
+                  {permCount} permission{permCount !== 1 ? "s" : ""}
+                </span>
+                <div className="ml-auto font-mono text-[10.5px] text-muted">
+                  <span className="text-ink-2/40">on </span>
+                  <span className="text-ink-2/70" title={r.resources.join(", ")}>
+                    {r.resources.length === 1 && r.resources[0] === "*"
+                      ? "all resources"
+                      : r.resources.length > 2
+                        ? `${r.resources.length} resources`
+                        : r.resources.join(", ")}
+                  </span>
+                </div>
+              </div>
               <div className="flex flex-wrap gap-1">
                 {r.services.flatMap((svc) =>
                   r.actions.map((a) => (
-                    <span key={`${svc}:${a}`} className="rounded bg-raised px-1.5 text-ink-2">
+                    <span
+                      key={`${svc}:${a}`}
+                      className={cn(
+                        "rounded px-2 py-0.5 font-mono text-[11px]",
+                        r.effect === "deny"
+                          ? "border border-crit/20 bg-crit/5 text-ink-2"
+                          : "border border-good/20 bg-good/5 text-ink-2"
+                      )}
+                    >
                       {svc}:{a}
                     </span>
                   ))
                 )}
               </div>
-              <div className="truncate text-muted" title={r.resources.join(", ")}>
-                on {r.resources.join(", ")}
-              </div>
             </div>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-3 text-[11.5px] text-muted">
-        <span>
-          scope <span className="text-ink-2">{scope}</span>
-        </span>
-        <span>
-          max TTL <span className="text-ink-2">{fmtDuration(p.constraints.maxSessionDuration)}</span>
-        </span>
-        <span>
-          escalations <span className="text-ink-2">{p.constraints.maxEscalationsPerSession}</span>
-        </span>
-        <span>
-          regions <span className="text-ink-2">{p.constraints.allowedRegions.join(", ") || "any"}</span>
-        </span>
+          );
+        })}
+      </div>
+
+      {/* Constraints footer — single compact row */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line bg-page/40 px-5 py-2 text-[11px]">
+        <span><span className="text-muted">TTL </span><span className="font-mono text-ink-2">{fmtDuration(p.constraints.maxSessionDuration)}</span></span>
+        <span><span className="text-muted">Escalations </span><span className="font-mono text-ink-2">{p.constraints.maxEscalationsPerSession}</span></span>
+        <span><span className="text-muted">Regions </span><span className="font-mono text-ink-2">{p.constraints.allowedRegions.join(", ") || "Any"}</span></span>
       </div>
     </Card>
   );
 }
+

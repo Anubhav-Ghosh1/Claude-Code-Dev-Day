@@ -5,7 +5,7 @@ import { updatePolicySchema } from '@/lib/validation/schemas';
 import { successResponse, errorResponse } from '@/lib/utils/response';
 import { writeAuditLog } from '@/lib/audit/logger';
 import { BadRequestError, NotFoundError } from '@/lib/errors/api-errors';
-import { requireDashboardAuth } from '@/lib/auth/dashboard-auth';
+import { tryDashboardAuth } from '@/lib/auth/dashboard-auth';
 
 export async function GET(
   _request: NextRequest,
@@ -27,7 +27,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await requireDashboardAuth('policies.write');
+    const user = await tryDashboardAuth('policies.write');
     const body = await request.json();
     const parsed = updatePolicySchema.safeParse(body);
     if (!parsed.success) {
@@ -47,8 +47,8 @@ export async function PUT(
     await policy.save();
 
     await writeAuditLog({
-      actorType: 'dashboard_user',
-      actorId: user.email,
+      actorType: user ? 'dashboard_user' : 'api',
+      actorId: user?.email ?? 'api_caller',
       action: 'policy.updated',
       severity: 'info',
       details: { policyId: id, version: policy.version, changes: Object.keys(parsed.data) },
@@ -65,7 +65,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await requireDashboardAuth('policies.write');
+    const user = await tryDashboardAuth('policies.write');
     await connectDB();
     const { id } = await params;
     const policy = await Policy.findOne({ policyId: id });
@@ -75,8 +75,8 @@ export async function DELETE(
     await policy.save();
 
     await writeAuditLog({
-      actorType: 'dashboard_user',
-      actorId: user.email,
+      actorType: user ? 'dashboard_user' : 'api',
+      actorId: user?.email ?? 'api_caller',
       action: 'policy.disabled',
       severity: 'info',
       details: { policyId: id, name: policy.name },

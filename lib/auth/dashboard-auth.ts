@@ -28,3 +28,18 @@ export async function requireDashboardAuth(permission?: string): Promise<Dashboa
 
   return user;
 }
+
+export async function tryDashboardAuth(permission?: string): Promise<DashboardUser | null> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return null;
+
+  const user: DashboardUser = {
+    email: session.user.email!,
+    name: session.user.name!,
+    role: (session.user as { role?: UserRole }).role || 'viewer',
+  };
+
+  if (permission && !hasPermission(user.role, permission)) return null;
+
+  return user;
+}

@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "@aws-sdk/client-sts": "^3.1141.0",
     "bcryptjs": "^2.4.3",
     "date-fns": "^3.6.0",

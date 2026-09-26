@@ -2,6 +2,7 @@ import { AssumeRoleCommand } from '@aws-sdk/client-sts';
 import { getSTSClient } from './sts-client';
 import { buildPolicyDocument } from './policy-document-builder';
 import { encrypt } from '@/lib/crypto/encryption';
+import { issueMockCredentials } from './mock-credential-broker';
 import type { PermissionEntry } from '@/types/models';
 
 export interface BrokerResult {
@@ -18,12 +19,20 @@ export interface BrokerResult {
   inlinePolicy: Record<string, unknown>;
 }
 
+export function isMockMode(): boolean {
+  return process.env.USE_MOCK_STS === 'true';
+}
+
 export async function issueCredentials(
   sessionId: string,
   agentId: string,
   grantedPermissions: PermissionEntry[],
   durationSeconds: number
 ): Promise<BrokerResult> {
+  if (isMockMode()) {
+    return issueMockCredentials(sessionId, agentId, grantedPermissions, durationSeconds);
+  }
+
   const targetRoleArn = process.env.AWS_TARGET_ROLE_ARN;
   if (!targetRoleArn) throw new Error('AWS_TARGET_ROLE_ARN not configured');
 

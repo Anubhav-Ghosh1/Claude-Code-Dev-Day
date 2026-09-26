@@ -34,12 +34,14 @@
 - [x] `lib/validation/schemas.ts` — Zod schemas for all API inputs (sessions, escalations, agents, policies) with ARN regex
 - [x] `lib/validation/permission-validator.ts` — Deny-first policy evaluation with glob matching on service/action and ARN pattern matching
 - [x] `lib/validation/over-privilege-detector.ts` — Wildcard/admin/broad-resource flagging with 0-1 risk score
+- [x] `lib/validation/ai-validator.ts` — Claude API agent evaluates gist vs requested permissions, flags mismatches, suggests narrower scopes (toggle: `ENABLE_AI_VALIDATION=true`)
 
 ### AWS Integration
 - [x] `lib/aws/sts-client.ts` — Singleton STSClient
 - [x] `lib/aws/arn-validator.ts` — ARN parsing, validation, pattern matching with glob-to-regex
 - [x] `lib/aws/policy-document-builder.ts` — Permissions to IAM policy document with 2048 char limit validation
-- [x] `lib/aws/credential-broker.ts` — STS AssumeRole with inline session policy, session tags, encryption of returned credentials
+- [x] `lib/aws/credential-broker.ts` — STS AssumeRole with inline session policy, session tags, encryption of returned credentials. Routes through mock when `USE_MOCK_STS=true`
+- [x] `lib/aws/mock-credential-broker.ts` — Generates realistic fake STS credentials for MVP demo (toggle: `USE_MOCK_STS=true`)
 
 ### Audit System
 - [x] `lib/audit/hash-chain.ts` — SHA-256 chain computation (genesis seed + entry hashing)

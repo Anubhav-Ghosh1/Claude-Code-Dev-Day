@@ -11,7 +11,8 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       services: {
         mongodb: mongoStatus,
-        aws_sts: process.env.AWS_TARGET_ROLE_ARN ? 'configured' : 'not_configured',
+        aws_sts: process.env.USE_MOCK_STS === 'true' ? 'mock' : process.env.AWS_TARGET_ROLE_ARN ? 'configured' : 'not_configured',
+        ai_validation: process.env.ENABLE_AI_VALIDATION === 'true' && process.env.ANTHROPIC_API_KEY ? 'enabled' : 'disabled',
       },
     },
   });

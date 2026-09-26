@@ -6,7 +6,8 @@ import { Token } from '@/lib/db/models/token.model';
 import { authenticateAgent } from '@/lib/auth/api-key-auth';
 import { validatePermissions } from '@/lib/validation/permission-validator';
 import { detectOverPrivilege } from '@/lib/validation/over-privilege-detector';
-import { issueCredentials } from '@/lib/aws/credential-broker';
+import { validateWithAI, isAIValidationEnabled } from '@/lib/validation/ai-validator';
+import { issueCredentials, isMockMode } from '@/lib/aws/credential-broker';
 import { createSessionSchema } from '@/lib/validation/schemas';
 import { checkRateLimit } from '@/lib/rate-limit/limiter';
 import { writeSessionAuditLogs } from '@/lib/audit/logger';
@@ -46,6 +47,11 @@ export async function POST(request: NextRequest) {
 
     if (granted.length === 0) {
       throw new ForbiddenError('All requested permissions were denied by policy');
+    }
+
+    let aiValidation = null;
+    if (isAIValidationEnabled()) {
+      aiValidation = await validateWithAI(parsed.data.gist, granted);
     }
 
     const { flags: overPrivilegeFlags, score: overPrivilegeScore } =
@@ -128,6 +134,12 @@ export async function POST(request: NextRequest) {
           permissionsDenied: denied.length,
           ttlSeconds,
           overPrivilegeScore,
+          mockMode: isMockMode(),
+          ...(aiValidation && {
+            aiApproved: aiValidation.approved,
+            aiConfidence: aiValidation.confidenceScore,
+            aiFlaggedCount: aiValidation.flaggedPermissions.length,
+          }),
         },
         sourceIp,
         userAgent,
@@ -182,6 +194,16 @@ export async function POST(request: NextRequest) {
         grantedPermissions: granted,
         deniedPermissions: denied,
         overPrivilegeFlags,
+        ...(aiValidation && {
+          aiValidation: {
+            approved: aiValidation.approved,
+            reasoning: aiValidation.reasoning,
+            flaggedPermissions: aiValidation.flaggedPermissions,
+            suggestedPermissions: aiValidation.suggestedPermissions,
+            confidenceScore: aiValidation.confidenceScore,
+          },
+        }),
+        ...(isMockMode() && { _mock: true }),
         ttl: {
           issuedAt: now.toISOString(),
           expiresAt: expiresAt.toISOString(),

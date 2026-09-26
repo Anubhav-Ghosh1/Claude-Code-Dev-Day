@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
-import { ErrorState } from "@/components/shared/empty-state";
+import { ErrorState, GuidedEmptyState } from "@/components/shared/empty-state";
 import { SessionsTable } from "@/components/sessions/sessions-table";
 import { CreateSessionDialog } from "@/components/sessions/create-session-dialog";
 import { fmtNum } from "@/lib/utils";
@@ -44,6 +44,31 @@ export default function SessionsPage() {
           </Button>
         }
       />
+      {data && data.data?.length === 0 && !status && !agentId && !deferredSearch ? (
+        <GuidedEmptyState
+          title="No credential sessions yet"
+          description="A session is a scoped, time-bound set of AWS credentials issued to an agent for a specific task. Here's how to create one:"
+          steps={[
+            { label: "Register an agent", detail: "Go to the Agents page and click \"Register agent\". You'll get an API key." },
+            { label: "Create a policy", detail: "Go to the Policies page and define what AWS services and actions the agent is allowed to use." },
+            { label: "Click \"Create session\" above", detail: "Pick the agent, describe what it's doing (the gist), and list the AWS permissions it needs." },
+            { label: "Get scoped credentials back", code: "{\n  \"credentials\": {\n    \"accessKeyId\": \"ASIAMOCK...\",\n    \"secretAccessKey\": \"mock-secret-...\",\n    \"sessionToken\": \"mock-session-token-...\",\n    \"expiration\": \"2026-09-26T12:00:00Z\"\n  }\n}" },
+          ]}
+          cta={{ label: "Create your first session", onClick: () => setCreateOpen(true) }}
+          apiExample={{
+            method: "POST",
+            url: "http://localhost:3000/api/v1/sessions",
+            body: JSON.stringify({
+              gist: "Deploy user-service Lambda with DynamoDB table",
+              permissions: [
+                { service: "lambda", action: "CreateFunction", resource: "arn:aws:lambda:us-east-1:123456789012:function:user-service-*" },
+                { service: "dynamodb", action: "CreateTable", resource: "arn:aws:dynamodb:us-east-1:123456789012:table/user-profiles" },
+              ],
+              estimatedDuration: 1800,
+            }, null, 2),
+          }}
+        />
+      ) : (
       <Card>
         <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
           <div className="relative w-72">
@@ -84,6 +109,7 @@ export default function SessionsPage() {
           </div>
         )}
       </Card>
+      )}
 
       <CreateSessionDialog
         open={createOpen}

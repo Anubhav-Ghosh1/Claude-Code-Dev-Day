@@ -2,16 +2,17 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Ban, PauseCircle, Plus } from "lucide-react";
-import type { Agent } from "@/types/dashboard";
+import { Ban, PauseCircle, Plus, Search } from "lucide-react";
+import type { Agent, AgentStatus } from "@/types/dashboard";
 import { useAgents, usePolicies } from "@/hooks/use-api";
 import { api } from "@/lib/api/client";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { Input, Select } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ErrorState } from "@/components/shared/empty-state";
+import { ErrorState, GuidedEmptyState } from "@/components/shared/empty-state";
 import { AgentStatusBadge } from "@/components/shared/status";
 import { CopyText } from "@/components/shared/copy-text";
 import { TimeAgo } from "@/components/shared/time-ago";
@@ -19,12 +20,37 @@ import { RegisterAgentDialog } from "@/components/agents/register-dialog";
 
 type PendingAction = { agent: Agent; status: "suspended" | "revoked" } | null;
 
+type SortKey = "name-asc" | "name-desc" | "last-active" | "sessions";
+
 export default function AgentsPage() {
   const { data: agents, error, mutate } = useAgents();
   const { data: policies } = usePolicies();
   const policyNames = useMemo(() => new Map(policies?.map((p) => [p.policyId, p.name])), [policies]);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<AgentStatus | "">("");
+  const [sort, setSort] = useState<SortKey>("name-asc");
+
+  const filtered = useMemo(() => {
+    if (!agents) return undefined;
+    let list = [...agents];
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((a) => a.name.toLowerCase().includes(q) || (a.description || "").toLowerCase().includes(q));
+    }
+    if (statusFilter) list = list.filter((a) => a.status === statusFilter);
+    list.sort((a, b) => {
+      switch (sort) {
+        case "name-asc": return a.name.localeCompare(b.name);
+        case "name-desc": return b.name.localeCompare(a.name);
+        case "last-active": return (b.lastActiveAt ?? "").localeCompare(a.lastActiveAt ?? "");
+        case "sessions": return (b.totalSessions ?? 0) - (a.totalSessions ?? 0);
+        default: return 0;
+      }
+    });
+    return list;
+  }, [agents, search, statusFilter, sort]);
 
   const apply = async () => {
     if (!pending) return;
@@ -49,7 +75,44 @@ export default function AgentsPage() {
           </Button>
         }
       />
-      <Card>
+      {agents && agents.length === 0 ? (
+        <GuidedEmptyState
+          title="No agents registered yet"
+          description="Agents are AI services (like Claude Code) that request scoped AWS credentials through AgentVault. Each agent gets its own API key."
+          steps={[
+            { label: "Click \"Register agent\" above" },
+            { label: "Fill in agent name, team, and environment" },
+            { label: "Copy the API key — it's shown only once", detail: "AgentVault only stores a bcrypt hash. Give the key to your agent as the X-API-Key header." },
+            { label: "Use the key in agent requests", code: "curl -X POST /api/v1/sessions \\\n  -H \"X-API-Key: avk_live_...\" \\\n  -d '{\"gist\": \"...\", \"permissions\": [...]}'" },
+          ]}
+          cta={{ label: "Register your first agent", onClick: () => setRegisterOpen(true) }}
+          apiExample={{
+            method: "POST",
+            url: "http://localhost:3000/api/v1/agents",
+            body: JSON.stringify({ name: "my-agent", description: "Demo agent", metadata: { team: "platform", environment: "staging" } }, null, 2),
+          }}
+        />
+      ) : (
+        <Card>
+        <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
+          <div className="relative w-64">
+            <Search size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+            <Input placeholder="Search agents…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+          </div>
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as AgentStatus | "")} className="w-40" aria-label="Status">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+            <option value="revoked">Revoked</option>
+          </Select>
+          <Select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="w-44" aria-label="Sort">
+            <option value="name-asc">Name A–Z</option>
+            <option value="name-desc">Name Z–A</option>
+            <option value="last-active">Last active ↓</option>
+            <option value="sessions">Sessions ↓</option>
+          </Select>
+          {filtered && <span className="tabular ml-auto pr-2 font-mono text-[11.5px] text-muted">{filtered.length} agents</span>}
+        </div>
         {error && <ErrorState error={error} />}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-[13px]">
@@ -65,7 +128,7 @@ export default function AgentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {!agents &&
+              {!filtered &&
                 Array.from({ length: 6 }, (_, i) => (
                   <tr key={i}>
                     <td colSpan={7} className="px-5 py-4">
@@ -73,7 +136,7 @@ export default function AgentsPage() {
                     </td>
                   </tr>
                 ))}
-              {agents?.map((a) => (
+              {filtered?.map((a) => (
                 <tr key={a.agentId} className="hover:bg-raised/40">
                   <td className="max-w-[300px] py-3 pl-5">
                     <div className="font-mono text-[12.5px] text-ink">{a.name}</div>
@@ -131,6 +194,7 @@ export default function AgentsPage() {
           </table>
         </div>
       </Card>
+      )}
 
       <RegisterAgentDialog open={registerOpen} onClose={() => setRegisterOpen(false)} policies={policies ?? []} onRegistered={() => mutate()} />
 

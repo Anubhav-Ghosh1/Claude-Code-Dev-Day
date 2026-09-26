@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Pencil, Ban, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Ban, RotateCcw, Search } from "lucide-react";
 import { usePolicies } from "@/hooks/use-api";
 import type { Policy } from "@/types/dashboard";
 import { api } from "@/lib/api/client";
@@ -10,17 +10,42 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { Input, Select } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ErrorState } from "@/components/shared/empty-state";
+import { ErrorState, GuidedEmptyState } from "@/components/shared/empty-state";
 import { PolicyEditorDialog } from "@/components/policies/policy-editor-dialog";
 import { fmtDuration, cn } from "@/lib/utils";
 
+type PolicySort = "priority-desc" | "priority-asc" | "name-asc" | "newest";
+
 export default function PoliciesPage() {
   const { data, error, mutate } = usePolicies();
-  const sorted = data ? [...data].sort((a, b) => b.priority - a.priority) : undefined;
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<Policy | undefined>();
   const [disableTarget, setDisableTarget] = useState<Policy | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"active" | "disabled" | "">("");
+  const [sort, setSort] = useState<PolicySort>("priority-desc");
+
+  const filtered = useMemo(() => {
+    if (!data) return undefined;
+    let list = [...data];
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q));
+    }
+    if (statusFilter) list = list.filter((p) => p.status === statusFilter);
+    list.sort((a, b) => {
+      switch (sort) {
+        case "priority-desc": return b.priority - a.priority;
+        case "priority-asc": return a.priority - b.priority;
+        case "name-asc": return a.name.localeCompare(b.name);
+        case "newest": return (b.createdAt ?? "").localeCompare(a.createdAt ?? "");
+        default: return 0;
+      }
+    });
+    return list;
+  }, [data, search, statusFilter, sort]);
 
   const openCreate = () => {
     setEditingPolicy(undefined);
@@ -65,10 +90,54 @@ export default function PoliciesPage() {
           </Button>
         }
       />
+      <Card className="mb-4 flex flex-wrap items-center gap-2 p-3">
+        <div className="relative w-64">
+          <Search size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+          <Input placeholder="Search policies…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+        </div>
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "active" | "disabled" | "")} className="w-36" aria-label="Status">
+          <option value="">All</option>
+          <option value="active">Active</option>
+          <option value="disabled">Disabled</option>
+        </Select>
+        <Select value={sort} onChange={(e) => setSort(e.target.value as PolicySort)} className="w-40" aria-label="Sort">
+          <option value="priority-desc">Priority ↓</option>
+          <option value="priority-asc">Priority ↑</option>
+          <option value="name-asc">Name A–Z</option>
+          <option value="newest">Newest first</option>
+        </Select>
+        {filtered && <span className="tabular ml-auto pr-2 font-mono text-[11.5px] text-muted">{filtered.length} policies</span>}
+      </Card>
+
       {error && <ErrorState error={error} />}
+      {data && data.length === 0 ? (
+        <GuidedEmptyState
+          title="No policies defined"
+          description="Policies control what AWS permissions agents can request. Without policies, all permissions are denied by default (deny-first)."
+          steps={[
+            { label: "Click \"Create policy\" above" },
+            { label: "Add rules — each rule allows or denies specific AWS services, actions, and resources", code: "ALLOW  lambda:*, s3:*, dynamodb:*\n  on arn:aws:*:us-east-1:123456789012:*\n\nDENY   iam:*, organizations:*, sts:*\n  on *" },
+            { label: "Set constraints", detail: "Max session duration, max escalations per session, and allowed AWS regions." },
+            { label: "Set priority", detail: "Higher priority policies are evaluated first. At equal priority, deny always wins." },
+          ]}
+          cta={{ label: "Create your first policy", onClick: openCreate }}
+          apiExample={{
+            method: "POST",
+            url: "http://localhost:3000/api/v1/policies",
+            body: JSON.stringify({
+              name: "staging-deploy",
+              rules: [
+                { effect: "allow", services: ["lambda", "s3", "dynamodb"], actions: ["*"], resources: ["arn:aws:*:us-east-1:123456789012:*"] },
+                { effect: "deny", services: ["iam", "sts"], actions: ["*"], resources: ["*"] },
+              ],
+              priority: 10,
+            }, null, 2),
+          }}
+        />
+      ) : (
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        {!sorted && Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-56 rounded-lg" />)}
-        {sorted?.map((p, i) => (
+        {!filtered && Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-56 rounded-lg" />)}
+        {filtered?.map((p, i) => (
           <PolicyCard
             key={p.policyId}
             policy={p}
@@ -79,6 +148,7 @@ export default function PoliciesPage() {
           />
         ))}
       </div>
+      )}
 
       <PolicyEditorDialog
         open={editorOpen}

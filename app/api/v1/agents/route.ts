@@ -8,6 +8,8 @@ import { successResponse, paginatedResponse, errorResponse } from '@/lib/utils/r
 import { parsePagination } from '@/lib/utils/pagination';
 import { writeAuditLog } from '@/lib/audit/logger';
 import { BadRequestError, ConflictError } from '@/lib/errors/api-errors';
+import { Session } from '@/lib/db/models/session.model';
+import { expireStaleSessions } from '@/lib/sessions/expire-stale';
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,6 +76,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
+    await expireStaleSessions();
 
     const { searchParams } = new URL(request.url);
     const { page, limit, skip } = parsePagination({
@@ -90,11 +93,24 @@ export async function GET(request: NextRequest) {
         .select('-apiKeyHash')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
       Agent.countDocuments(filter),
     ]);
 
-    return paginatedResponse(agents, total, page, limit);
+    // Per-agent session counts for the dashboard (one aggregation, not N queries).
+    const counts = await Session.aggregate<{ _id: string; total: number; active: number }>([
+      { $match: { agentId: { $in: agents.map((a) => a.agentId) } } },
+      { $group: { _id: '$agentId', total: { $sum: 1 }, active: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } } } },
+    ]);
+    const byAgent = new Map(counts.map((c) => [c._id, c]));
+    const withCounts = agents.map((a) => ({
+      ...a,
+      activeSessions: byAgent.get(a.agentId)?.active ?? 0,
+      totalSessions: byAgent.get(a.agentId)?.total ?? 0,
+    }));
+
+    return paginatedResponse(withCounts, total, page, limit);
   } catch (error) {
     return errorResponse(error);
   }

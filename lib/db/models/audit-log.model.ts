@@ -46,7 +46,9 @@ const AuditLogSchema = new Schema<IAuditLog>(
     sourceIp: String,
     userAgent: String,
   },
-  { timestamps: false }
+  // minimize: false — Mongoose would otherwise strip empty objects (e.g. metadata: {})
+  // from details on save, and the stored entry would no longer match its hash.
+  { timestamps: false, minimize: false }
 );
 
 // Block all mutation operations

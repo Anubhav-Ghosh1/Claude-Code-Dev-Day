@@ -6,19 +6,27 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:admin": "npx tsx --env-file=.env scripts/seed-admin.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
     "@aws-sdk/client-sts": "^3.1141.0",
     "bcryptjs": "^2.4.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
+    "lucide-react": "^1.48.0",
     "mongoose": "^8.24.4",
     "nanoid": "^5.1.16",
     "next": "16.3.6",
     "next-auth": "^4.24.15",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "recharts": "^3.10.1",
+    "sonner": "^2.0.8",
+    "swr": "^2.5.1",
+    "tailwind-merge": "^3.7.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -30,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * AgentVault console — dark, hairline, instrument-panel feel.
+ * Chart/status colors are the dataviz reference palette (dark steps),
+ * validated against the #1a1a19 surface.
+ */
+@theme {
+  --font-sans: var(--font-ui), system-ui, sans-serif;
+  --font-mono: var(--font-code), ui-monospace, monospace;
+
+  --color-page: #0d0d0d;
+  --color-surface: #1a1a19;
+  --color-raised: #222220;
+  --color-line: #2c2c2a;
+  --color-line-strong: #383835;
+
+  --color-ink: #ffffff;
+  --color-ink-2: #c3c2b7;
+  --color-muted: #898781;
+
+  /* status — reserved for meaning, always paired with icon/label */
+  --color-good: #0ca30c;
+  --color-warn: #fab219;
+  --color-serious: #ec835a;
+  --color-crit: #d03b3b;
+
+  /* categorical series, fixed order */
+  --color-s1: #3987e5;
+  --color-s2: #d95926;
+
+  --color-accent: #9085e9;
+
+  --animate-rise: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-pulse-dot: pulse-dot 2s ease-out infinite;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
+@keyframes pulse-dot {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+@keyframes flash-in {
+  from {
+    background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+html {
+  color-scheme: dark;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  /* faint dot grid — the "vault floor" */
+  background-image: radial-gradient(color-mix(in srgb, #fff 5%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.flash-in {
+  animation: flash-in 2.4s ease-out;
+}
+
+/* Recharts: keep chrome recessive */
+.recharts-cartesian-axis-tick-value {
+  fill: var(--color-muted);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+.recharts-surface:focus,
+.recharts-wrapper:focus,
+.recharts-sector:focus {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

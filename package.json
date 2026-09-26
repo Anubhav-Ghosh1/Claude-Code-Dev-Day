@@ -9,12 +9,20 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-sts": "^3.1141.0",
+    "bcryptjs": "^2.4.3",
+    "date-fns": "^3.6.0",
+    "mongoose": "^8.24.4",
+    "nanoid": "^5.1.16",
     "next": "16.3.6",
+    "next-auth": "^4.24.15",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

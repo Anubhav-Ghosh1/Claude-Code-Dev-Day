@@ -1,0 +1,11 @@
+export const DEFAULT_SESSION_TTL = parseInt(process.env.DEFAULT_SESSION_TTL || '3600', 10);
+export const MAX_SESSION_TTL = parseInt(process.env.MAX_SESSION_TTL || '43200', 10);
+export const API_KEY_BCRYPT_ROUNDS = parseInt(process.env.API_KEY_BCRYPT_ROUNDS || '12', 10);
+export const MAX_GIST_LENGTH = 4096;
+export const MAX_ESCALATIONS_DEFAULT = 3;
+export const MAX_ACTIVE_SESSIONS_DEFAULT = 5;
+export const MAX_REQUESTS_PER_MINUTE_DEFAULT = 30;
+export const AUDIT_GENESIS_SEED = 'AgentVault-AuditLog-Genesis-v1';
+export const API_KEY_PREFIX_LENGTH = 12;
+export const API_KEY_LIVE_PREFIX = 'avk_live_';
+export const API_KEY_TEST_PREFIX = 'avk_test_';

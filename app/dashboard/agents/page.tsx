@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Ban, PauseCircle, Plus, Search } from "lucide-react";
+import { Ban, ChevronRight, PauseCircle, Plus, Search } from "lucide-react";
 import type { Agent, AgentStatus } from "@/types/dashboard";
 import { useAgents, usePolicies } from "@/hooks/use-api";
 import { api } from "@/lib/api/client";
@@ -17,6 +17,8 @@ import { AgentStatusBadge } from "@/components/shared/status";
 import { CopyText } from "@/components/shared/copy-text";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { RegisterAgentDialog } from "@/components/agents/register-dialog";
+import { AgentUsagePanel } from "@/components/agents/agent-usage-panel";
+import { cn } from "@/lib/utils";
 
 type PendingAction = { agent: Agent; status: "suspended" | "revoked" } | null;
 
@@ -28,6 +30,7 @@ export default function AgentsPage() {
   const policyNames = useMemo(() => new Map(policies?.map((p) => [p.policyId, p.name])), [policies]);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<AgentStatus | "">("");
   const [sort, setSort] = useState<SortKey>("name-asc");
@@ -114,7 +117,7 @@ export default function AgentsPage() {
           {filtered && <span className="tabular ml-auto pr-2 font-mono text-[11.5px] text-muted">{filtered.length} agents</span>}
         </div>
         {error && <ErrorState error={error} />}
-        <div className="overflow-x-auto">
+        <div className="@container overflow-x-auto">
           <table className="w-full min-w-[980px] text-[13px]">
             <thead>
               <tr className="border-b border-line text-left text-[11px] text-muted">
@@ -136,10 +139,30 @@ export default function AgentsPage() {
                     </td>
                   </tr>
                 ))}
-              {filtered?.map((a) => (
-                <tr key={a.agentId} className="hover:bg-raised/40">
+              {filtered?.map((a) => {
+                const open = expanded === a.agentId;
+                return (
+                <Fragment key={a.agentId}>
+                <tr
+                  onClick={() => setExpanded(open ? null : a.agentId)}
+                  className={cn("cursor-pointer hover:bg-raised/40", open && "bg-raised/40")}
+                >
                   <td className="max-w-[300px] py-3 pl-5">
-                    <div className="font-mono text-[12.5px] text-ink">{a.name}</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        aria-expanded={open}
+                        aria-label={`${open ? "Hide" : "Show"} usage for ${a.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpanded(open ? null : a.agentId);
+                        }}
+                        className="-ml-1 cursor-pointer rounded p-0.5 text-muted hover:bg-raised hover:text-ink"
+                      >
+                        <ChevronRight size={14} className={cn("transition-transform", open && "rotate-90")} />
+                      </button>
+                      <span className="font-mono text-[12.5px] text-ink">{a.name}</span>
+                    </div>
                     <div className="truncate text-[12px] text-muted" title={a.description}>
                       {a.description || "—"}
                     </div>
@@ -174,7 +197,7 @@ export default function AgentsPage() {
                     <span className="text-muted"> / {a.totalSessions ?? 0}</span>
                   </td>
                   <td className="py-3 pl-6 text-[12px] text-muted">{a.lastActiveAt ? <TimeAgo iso={a.lastActiveAt} /> : "never"}</td>
-                  <td className="py-3 pr-5">
+                  <td className="py-3 pr-5" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1.5">
                       {a.status === "active" && (
                         <Button size="sm" variant="ghost" onClick={() => setPending({ agent: a, status: "suspended" })}>
@@ -189,7 +212,19 @@ export default function AgentsPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                {open && (
+                  <tr className="bg-page/40">
+                    <td colSpan={7} className="border-t border-line p-0">
+                      {/* pinned to the visible width, so it doesn't scroll sideways with the wide table */}
+                      <div className="sticky left-0 w-[100cqw]">
+                        <AgentUsagePanel agent={a} policies={policies} />
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

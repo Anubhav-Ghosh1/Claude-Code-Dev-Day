@@ -5,20 +5,19 @@ import { Agent } from '@/lib/db/models/agent.model';
 import { Session } from '@/lib/db/models/session.model';
 import { writeAuditLog } from '@/lib/audit/logger';
 import { revokeSession } from '@/lib/sessions/revoke';
+import { requireDashboardAuth } from '@/lib/auth/dashboard-auth';
 import { successResponse, errorResponse } from '@/lib/utils/response';
 import { BadRequestError, ConflictError, NotFoundError } from '@/lib/errors/api-errors';
 
 const updateAgentStatusSchema = z.object({ status: z.enum(['suspended', 'revoked']) });
 
-/**
- * Suspend or revoke an agent. Suspended agents can't request new credentials;
- * revoking also kills every active session immediately. Revoked is terminal.
- */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await requireDashboardAuth('agents.write');
+
     const parsed = updateAgentStatusSchema.safeParse(await request.json());
     if (!parsed.success) {
       throw new BadRequestError('Validation failed', { errors: parsed.error.flatten().fieldErrors });
@@ -34,13 +33,13 @@ export async function PATCH(
     agent.status = parsed.data.status;
     await agent.save();
 
-    const actor = { actorType: 'dashboard_user' as const, actorId: 'dashboard' };
+    const actor = { actorType: 'dashboard_user' as const, actorId: user.email };
     await writeAuditLog({
       agentId: agent.agentId,
       ...actor,
       action: parsed.data.status === 'suspended' ? 'agent.suspended' : 'agent.revoked',
       severity: 'warning',
-      details: { agentId: agent.agentId, name: agent.name },
+      details: { agentId: agent.agentId, name: agent.name, revokedBy: user.email },
     });
 
     if (parsed.data.status === 'revoked') {

@@ -203,6 +203,20 @@ export interface Policy {
   updatedAt: string;
 }
 
+export interface CreatePolicyInput {
+  name: string;
+  description?: string;
+  rules: PolicyRule[];
+  scope?: { agentIds?: string[]; agentMetadata?: Record<string, string> };
+  constraints?: {
+    maxSessionDuration?: number;
+    maxEscalationsPerSession?: number;
+    maxConcurrentSessions?: number;
+    allowedRegions?: string[];
+  };
+  priority?: number;
+}
+
 // ---------- analytics ----------
 
 export type AnalyticsRange = "24h" | "7d" | "14d";

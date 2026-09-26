@@ -101,8 +101,22 @@
 
 ## Next Steps
 
-### Phase 5 leftovers
-- [ ] NextAuth setup + auth guard (dashboard and dashboard-only routes are currently open)
+### Phase 5: Dashboard Authentication — DONE
+- [x] User model (`lib/db/models/user.model.ts`) — email, bcrypt password, role, status
+- [x] NextAuth config (`lib/auth/next-auth-options.ts`) — credentials provider, JWT strategy, role in token
+- [x] NextAuth API route (`app/api/auth/[...nextauth]/route.ts`)
+- [x] Sign-in page (`app/auth/signin/page.tsx`) — email/password form, error handling, redirect
+- [x] SessionProvider wrapper (`components/providers/session-provider.tsx`)
+- [x] Middleware auth guard — unauthenticated `/dashboard/*` redirects to sign-in
+- [x] Dashboard auth helper (`lib/auth/dashboard-auth.ts`) — `requireDashboardAuth(permission)` for API routes
+- [x] Fixed: `POST /sessions/:id/revoke` now requires dashboard auth + `sessions.revoke` permission
+- [x] Fixed: `PATCH /agents/:id` now requires dashboard auth + `agents.write` permission
+- [x] Sidebar shows logged-in user (name, role, initials) + sign-out button
+- [x] Audit log `actorId` tracks actual user email instead of generic "dashboard"
+- [x] Admin seed script (`scripts/seed-admin.ts`, `npm run seed:admin`)
+- [x] `GET /api/v1/auth/me` — returns current dashboard user info
+
+### Phase 5 remaining
 - [ ] Policy editor (create/edit UI; API already exists)
 - [ ] Real `ANTHROPIC_API_KEY` in env — without it Claude review is skipped (policy-only decisions)
 
@@ -135,6 +149,6 @@
 ## File Count
 - **95 TypeScript files** (excluding node_modules, .next)
 - **13 API route handlers**
-- **5 MongoDB models** + 1 counter model
+- **6 MongoDB models** (agent, session, audit-log, policy, token, user) + 1 counter model
 - **3 documentation files** (demo flow, AWS setup, sample task)
 - **0 TypeScript errors**

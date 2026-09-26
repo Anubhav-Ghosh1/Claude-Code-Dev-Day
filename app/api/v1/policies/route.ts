@@ -7,9 +7,11 @@ import { successResponse, paginatedResponse, errorResponse } from '@/lib/utils/r
 import { parsePagination } from '@/lib/utils/pagination';
 import { writeAuditLog } from '@/lib/audit/logger';
 import { BadRequestError } from '@/lib/errors/api-errors';
+import { requireDashboardAuth } from '@/lib/auth/dashboard-auth';
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireDashboardAuth('policies.write');
     const body = await request.json();
     const parsed = createPolicySchema.safeParse(body);
     if (!parsed.success) {
@@ -38,8 +40,8 @@ export async function POST(request: NextRequest) {
     });
 
     await writeAuditLog({
-      actorType: 'system',
-      actorId: 'system',
+      actorType: 'dashboard_user',
+      actorId: user.email,
       action: 'policy.created',
       severity: 'info',
       details: { policyId, name: policy.name, rulesCount: policy.rules.length },

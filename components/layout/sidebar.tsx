@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, FileLock2, LayoutDashboard, ScrollText, ShieldCheck } from "lucide-react";
+import { Bot, FileLock2, LayoutDashboard, LogOut, ScrollText, ShieldCheck } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
 import { useSessions } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
 
@@ -56,15 +57,40 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto space-y-3 p-4">
-        <div className="flex items-center gap-2.5 px-1">
-          <div className="flex size-7 items-center justify-center rounded-full bg-raised font-mono text-[11px] text-ink-2">AD</div>
-          <div className="text-[12px] leading-tight">
-            <div className="text-ink-2">admin</div>
-            <div className="text-muted">usr_admin</div>
-          </div>
-        </div>
+        <UserBlock />
       </div>
     </aside>
+  );
+}
+
+function UserBlock() {
+  const { data: session } = useSession();
+  const user = session?.user;
+  const role = (user as { role?: string } | undefined)?.role || "viewer";
+  const initials = (user?.name || "?")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  return (
+    <div className="flex items-center gap-2.5 px-1">
+      <div className="flex size-7 items-center justify-center rounded-full bg-raised font-mono text-[11px] text-ink-2">
+        {initials}
+      </div>
+      <div className="min-w-0 flex-1 text-[12px] leading-tight">
+        <div className="truncate text-ink-2">{user?.name || "User"}</div>
+        <div className="text-muted">{role}</div>
+      </div>
+      <button
+        onClick={() => signOut({ callbackUrl: "/auth/signin" })}
+        className="rounded p-1 text-muted transition-colors hover:bg-surface hover:text-ink-2"
+        title="Sign out"
+      >
+        <LogOut size={14} />
+      </button>
+    </div>
   );
 }
 

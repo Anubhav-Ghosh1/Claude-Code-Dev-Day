@@ -5,6 +5,7 @@ import type {
   ApiResponse,
   AuditLogFilters,
   AuditLogsResponse,
+  CreatePolicyInput,
   Policy,
   RegisterAgentInput,
   RegisterAgentResult,
@@ -55,4 +56,10 @@ export const api = {
     http<ApiResponse<Agent>>(`/agents/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
 
   listPolicies: () => http<ApiResponse<Policy[]>>(`/policies${qs({ limit: 100 })}`),
+  createPolicy: (input: CreatePolicyInput) =>
+    http<ApiResponse<Policy>>(`/policies`, { method: "POST", body: JSON.stringify(input) }),
+  updatePolicy: (id: string, input: Partial<CreatePolicyInput>) =>
+    http<ApiResponse<Policy>>(`/policies/${id}`, { method: "PUT", body: JSON.stringify(input) }),
+  deletePolicy: (id: string) =>
+    http<ApiResponse<{ message: string; policyId: string }>>(`/policies/${id}`, { method: "DELETE" }),
 };

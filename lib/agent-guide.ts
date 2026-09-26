@@ -104,25 +104,36 @@ ${headers}
 
 const md = oneLine;
 
-export function claudeMd(baseUrl: string, agent: Agent, sample: PermissionEntry): string {
-  // CLAUDE.md is committed to a repo, so it never contains the key itself.
-  const c = curlSnippets(baseUrl, agent, sample, { env: true });
+export function claudeMd(baseUrl: string, agent: Agent, sample: PermissionEntry, embeddedKey?: string): string {
+  const hasKey = !!embeddedKey;
+  const c = hasKey
+    ? curlSnippets(baseUrl, agent, sample, { apiKey: embeddedKey })
+    : curlSnippets(baseUrl, agent, sample, { env: true });
+
+  const keySection = hasKey
+    ? `- **Your credential:** the AgentVault API key is embedded in the commands below.
+  - The key: \`${embeddedKey}\`
+  - Keep this file secure — it contains a live credential.
+  - Never print, log, or commit the key to version control separately.`
+    : `- **Your only credential:** the AgentVault key in the \`AGENTVAULT_API_KEY\` environment variable
+  (it starts with \`${agent.apiKeyPrefix}\`).
+  - Never print the key, commit it, or write it to a file.
+  - If it isn't set, stop and ask the user to set it. Don't search for it elsewhere.`;
+
   return `# AgentVault: cloud access for this repo
 
 The AI agent working in this repo is registered in AgentVault as **${md(agent.name)}** (\`${agent.agentId}\`)${
     agent.description ? ` — ${md(agent.description)}` : ""
   }.
 
-You never get AWS keys. You open a session with AgentVault for the task, and AgentVault makes each AWS call for
-you — only the ones the session allows. Close the session when you're done.
+You never get AWS keys directly. You open a session with AgentVault, declare what you need to do, and
+AgentVault issues scoped, time-bound credentials — only for the permissions the session allows.
+Close the session when you're done.
 
 ## Setup
 
 - **Base URL:** ${baseUrl}
-- **Your only credential:** the AgentVault key in the \`AGENTVAULT_API_KEY\` environment variable
-  (it starts with \`${agent.apiKeyPrefix}\`).
-  - Never print the key, commit it, or write it to a file.
-  - If it isn't set, stop and ask the user to set it. Don't search for it elsewhere.
+${keySection}
 - **Tools:** \`curl\` and \`jq\`.
 
 ## Rules
@@ -141,7 +152,14 @@ you — only the ones the session allows. Close the session when you're done.
 ${c.request}
 \`\`\`
 
-The full response is printed. Check \`deniedPermissions\`: if something you need was denied, stop and tell the user.
+The full response is printed to stderr. \`SESSION_ID\` is captured automatically.
+
+**Check the response before proceeding:**
+- \`grantedPermissions\` — what you can do
+- \`deniedPermissions\` — if something you need was denied, **stop and tell the user**
+- \`overPrivilegeFlags\` — AgentVault flagged you asked for more than needed. Narrow your request next time.
+- \`credentials\` — scoped AWS credentials (if using direct AWS access mode)
+- \`ttl.expiresAt\` — when credentials expire. Plan your work to finish before this.
 
 ## 2. Make AWS calls through AgentVault
 
@@ -158,11 +176,46 @@ Calls outside the session's granted permissions are rejected with 403.
 ${c.escalate}
 \`\`\`
 
+Old credentials are revoked, new ones issued with combined permissions.
+
 ## 4. Finish — always
 
 \`\`\`bash
 ${c.complete}
 \`\`\`
+
+## Tips for requesting credentials
+
+### Be specific with permissions
+Bad: \`{ "service": "s3", "action": "*", "resource": "*" }\`
+Good: \`{ "service": "s3", "action": "GetObject", "resource": "arn:aws:s3:::my-bucket/reports/*" }\`
+
+### Common permission patterns
+
+| Task | Service | Action | Resource pattern |
+|---|---|---|---|
+| Read from S3 | s3 | GetObject | \`arn:aws:s3:::bucket-name/path/*\` |
+| Write to S3 | s3 | PutObject | \`arn:aws:s3:::bucket-name/path/*\` |
+| Read DynamoDB | dynamodb | GetItem, Query | \`arn:aws:dynamodb:*:*:table/table-name\` |
+| Write DynamoDB | dynamodb | PutItem | \`arn:aws:dynamodb:*:*:table/table-name\` |
+| Deploy Lambda | lambda | CreateFunction, UpdateFunctionCode | \`arn:aws:lambda:*:*:function:func-name\` |
+| Read logs | logs | FilterLogEvents, GetLogEvents | \`arn:aws:logs:*:*:log-group:*\` |
+
+### Handling credential expiry
+- Sessions have a TTL (default 1 hour, max 12 hours). Check \`ttl.expiresAt\` in the session response.
+- If your task takes longer, set \`estimatedDuration\` appropriately when opening the session.
+- If credentials expire mid-task, open a new session with the remaining work described in \`gist\`.
+
+### When permissions are denied
+1. Check the \`deniedPermissions\` array — it tells you exactly what was blocked and why.
+2. If it's a policy denial, the admin needs to update policies. Tell the user.
+3. If it's an over-privilege flag, narrow your request to only what's needed.
+4. Never try to work around denials — they exist for security.
+
+### Multiple operations in one session
+- Open **one session** for a logical task, not one per AWS call.
+- Request all permissions you'll need upfront.
+- If you discover you need more mid-task, use escalate (max 3 times per session).
 
 ## Permission format
 
@@ -177,10 +230,17 @@ ${c.complete}
 
 | Status | Meaning | What to do |
 |---|---|---|
-| 400 | Invalid request (usually a bad ARN or params) | Fix the request |
-| 401 | Missing or wrong AgentVault key | Ask the user to check \`AGENTVAULT_API_KEY\` |
-| 403 | Not allowed: action outside the session, agent suspended, or everything denied | Escalate with a reason, or stop and tell the user |
-| 409 | Session is no longer active (completed, expired or revoked) | Open a new session |
-| 429 | Too many requests or active sessions | Complete open sessions, then retry later |
+| 400 | Invalid request (bad ARN or params) | Fix the request and retry |
+| 401 | Missing or wrong AgentVault key | ${hasKey ? "Check the key in this file is still valid" : "Ask the user to check \\`AGENTVAULT_API_KEY\\`"} |
+| 403 | Not allowed: outside session scope, agent suspended, or policy denial | Escalate with a reason, or stop and tell the user |
+| 409 | Session no longer active (completed, expired or revoked) | Open a new session |
+| 429 | Rate limit: too many requests or active sessions | Complete open sessions, then retry |
+
+## Troubleshooting
+
+- **"No active session"** — You tried to call AWS without opening a session first. Run step 1.
+- **"Session expired"** — TTL exceeded. Open a new session for remaining work.
+- **"All permissions denied"** — No matching allow policy. Ask the user/admin to create one.
+- **"Agent suspended"** — This agent has been disabled. Ask the user to check the AgentVault dashboard.
 `;
 }

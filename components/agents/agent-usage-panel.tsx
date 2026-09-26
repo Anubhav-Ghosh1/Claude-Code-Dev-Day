@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Download, FileText, KeyRound, TriangleAlert } from "lucide-react";
+import { Copy, Download, Eye, EyeOff, FileText, KeyRound, TriangleAlert } from "lucide-react";
 import type { Agent, Policy } from "@/types/dashboard";
 import { claudeMd, curlSnippets, samplePermission } from "@/lib/agent-guide";
 import { appUrl } from "@/lib/app-url";
+import { toast } from "sonner";
 import { Segmented } from "@/components/ui/segmented";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
@@ -17,18 +18,31 @@ export function AgentUsagePanel({ agent, policies }: { agent: Agent; policies?: 
   const [view, setView] = useState<View>("curl");
   // Pasted key lives only in this component's memory: never stored, never sent to the server.
   const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
   const baseUrl = appUrl();
   const sample = samplePermission(policies);
   const keyOk = /^avk_(live|test)_[A-Za-z0-9]{8,}$/.test(apiKey.trim());
   const keyMismatch = keyOk && !apiKey.trim().startsWith(agent.apiKeyPrefix);
-  const c = curlSnippets(baseUrl, agent, sample, { apiKey: keyOk && !keyMismatch ? apiKey.trim() : undefined });
+  const resolvedKey = keyOk && !keyMismatch ? apiKey.trim() : undefined;
+  const c = curlSnippets(baseUrl, agent, sample, { apiKey: resolvedKey });
 
   const download = () => {
-    const blob = new Blob([claudeMd(baseUrl, agent, sample)], { type: "text/markdown" });
+    const content = resolvedKey
+      ? claudeMd(baseUrl, agent, sample, resolvedKey)
+      : claudeMd(baseUrl, agent, sample);
+    const blob = new Blob([content], { type: "text/markdown" });
     const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "CLAUDE.md" });
     a.click();
     URL.revokeObjectURL(a.href);
   };
+
+  const copyKey = () => {
+    if (!resolvedKey) return;
+    navigator.clipboard.writeText(resolvedKey);
+    toast.success("API key copied");
+  };
+
+  const maskedKey = resolvedKey ? `${resolvedKey.slice(0, 12)}${"•".repeat(resolvedKey.length - 16)}${resolvedKey.slice(-4)}` : "";
 
   return (
     <div className="space-y-4 px-5 py-5">
@@ -61,22 +75,47 @@ export function AgentUsagePanel({ agent, policies }: { agent: Agent; policies?: 
               <span className="flex items-center gap-2 text-[12.5px] text-ink-2">
                 <KeyRound size={14} className="text-muted" /> Agent key
               </span>
-              <Input
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder={`Paste the key starting with ${agent.apiKeyPrefix}`}
-                className="h-8 max-w-sm flex-1 font-mono text-[12px]"
-              />
+              <div className="relative max-w-sm flex-1">
+                <Input
+                  type={showKey ? "text" : "password"}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={`Paste the key starting with ${agent.apiKeyPrefix}`}
+                  className="h-8 pr-18 font-mono text-[12px]"
+                />
+                <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="cursor-pointer rounded p-1 text-muted transition-colors hover:text-ink"
+                    title={showKey ? "Hide key" : "Show key"}
+                  >
+                    {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                  {resolvedKey && (
+                    <button
+                      type="button"
+                      onClick={copyKey}
+                      className="cursor-pointer rounded p-1 text-muted transition-colors hover:text-ink"
+                      title="Copy key"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
             </label>
+            {resolvedKey && !showKey && (
+              <div className="mt-2 font-mono text-[11.5px] text-ink-2/60">{maskedKey}</div>
+            )}
             <p className="mt-2 text-[11.5px] leading-relaxed text-muted">
               {keyMismatch
                 ? `That key belongs to a different agent. This one starts with ${agent.apiKeyPrefix}.`
                 : keyOk
-                  ? "Key filled into the commands below. It stays in this page only and is never saved or sent."
-                  : "The key is the only credential the agent needs. It was shown once at registration; paste it to fill the commands. Lost it? Revoke this agent and register a new one."}
+                  ? "Key filled into commands below and CLAUDE.md download. Stays in this page only — never saved or sent."
+                  : "Paste the key to fill commands and enable CLAUDE.md download with embedded key. Lost it? Revoke this agent and register a new one."}
             </p>
           </div>
 

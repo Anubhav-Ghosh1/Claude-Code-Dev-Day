@@ -13,6 +13,8 @@ const TITLES: Record<string, string> = {
   audit: "Audit log",
   agents: "Agents",
   policies: "Policies",
+  cli: "CLI",
+  authorize: "Authorize",
 };
 
 export function Topbar() {

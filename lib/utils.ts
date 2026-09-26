@@ -52,3 +52,9 @@ export function shortArn(arn: string) {
   const parts = arn.split(":");
   return parts.length >= 6 ? parts.slice(5).join(":") || arn : arn;
 }
+
+/** "ASIAE29DW9ILENQV77HN" → "ASIA••••77HN". For identifiers that shouldn't be shown in full. */
+export function maskSecret(value: string, keep = 4) {
+  if (value.length <= keep * 2) return "•".repeat(value.length);
+  return `${value.slice(0, keep)}••••${value.slice(-keep)}`;
+}

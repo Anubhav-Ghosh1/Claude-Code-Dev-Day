@@ -22,7 +22,7 @@ import { AiReasoningCard } from "@/components/sessions/ai-reasoning-card";
 import { PermissionsDiff } from "@/components/sessions/permissions-diff";
 import { EscalationTimeline } from "@/components/sessions/escalation-timeline";
 import { AuditTrail } from "@/components/audit/audit-trail";
-import { cn, fmtDateTime, fmtDuration, fmtNum } from "@/lib/utils";
+import { cn, fmtDateTime, fmtDuration, fmtNum, maskSecret } from "@/lib/utils";
 
 type Tab = "overview" | "permissions" | "escalations" | "audit";
 
@@ -78,11 +78,17 @@ export default function SessionDetailPage() {
             <span>
               agent <span className="font-mono text-ink-2">{agentName}</span>
             </span>
+            {s.requestedBy && (
+              <span>
+                on behalf of <span className="text-ink-2">{s.requestedBy.email}</span>
+                <span className="text-muted"> via {s.requestedBy.via === "cli" ? "CLI" : "dashboard"}</span>
+              </span>
+            )}
             <span>
               role <span className="font-mono text-ink-2">{s.credentialRef.roleArn.split("/").pop()}</span>
             </span>
             <span>
-              key <span className="font-mono text-ink-2">{s.credentialRef.accessKeyId}</span>
+              key <span className="font-mono text-ink-2">{maskSecret(s.credentialRef.accessKeyId)}</span>
             </span>
           </div>
         </div>

@@ -59,9 +59,18 @@ export interface AiValidation {
   model?: string;
 }
 
+/** The signed-in person an agent acted for (user-level access — see docs/USER_LEVEL_ACCESS.md). */
+export interface RequestedBy {
+  userId: string;
+  email: string;
+  name?: string;
+  via: "cli" | "dashboard";
+}
+
 export interface Session {
   sessionId: string;
   agentId: string;
+  requestedBy?: RequestedBy; // absent until the backend ships user-level access
   gist: string;
   status: SessionStatus;
   requestedPermissions: PermissionEntry[];
@@ -277,4 +286,14 @@ export interface AnalyticsSummary {
     denialRate: number;
     violations: number;
   }[];
+}
+
+// ---------- CLI sign-in (device authorization) ----------
+
+/** Shown on /dashboard/cli/authorize so the user can confirm which terminal they're approving. */
+export interface CliDeviceRequest {
+  userCode: string; // e.g. "WDJB-MJHT", also printed in the terminal
+  clientName: string; // e.g. "agentvault-cli 0.1 on arun-mbp"
+  requestedAt: string;
+  expiresAt: string;
 }

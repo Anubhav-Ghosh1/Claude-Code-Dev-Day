@@ -101,6 +101,12 @@
 
 ## Next Steps
 
+### User-level access (spec: `docs/USER_LEVEL_ACCESS.md`)
+- [x] Frontend: terminal approval page (`/dashboard/cli/authorize`), "on behalf of" display, landing page copy
+- [ ] Backend: CLI device login endpoints, CLI tokens, per-user + per-agent limits, `requestedBy` on sessions
+- [ ] Backend: enforce Claude high-severity flags and stored policy constraints
+- [ ] Backend: auth on `POST /api/v1/agents` and the read endpoints; no default admin password
+
 ### Phase 5: Dashboard Authentication — DONE
 - [x] User model (`lib/db/models/user.model.ts`) — email, bcrypt password, role, status
 - [x] NextAuth config (`lib/auth/next-auth-options.ts`) — credentials provider, JWT strategy, role in token

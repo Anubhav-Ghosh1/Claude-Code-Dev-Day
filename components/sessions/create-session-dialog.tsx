@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, KeyRound, Copy, Check } from "lucide-react";
+import { Plus, Trash2, KeyRound, Copy, Check, Eye, EyeOff, TriangleAlert } from "lucide-react";
 import type { Agent, PermissionEntry, DashboardSessionResult } from "@/types/dashboard";
 import { api } from "@/lib/api/client";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/field";
-import { cn } from "@/lib/utils";
+import { maskSecret } from "@/lib/utils";
 
 const EMPTY_PERM: PermissionEntry = {
   service: "",
@@ -206,6 +206,7 @@ export function CreateSessionDialog({
 
 function CredentialReveal({ result, onDone }: { result: DashboardSessionResult; onDone: () => void }) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState(false);
 
   const copyField = (label: string, value: string) => {
     navigator.clipboard.writeText(value);
@@ -236,30 +237,43 @@ function CredentialReveal({ result, onDone }: { result: DashboardSessionResult; 
         </p>
       </div>
 
+      <div className="flex gap-3 rounded-md border border-warn/50 bg-warn/10 px-4 py-3">
+        <TriangleAlert size={16} className="mt-0.5 shrink-0 text-warn" />
+        <p className="text-[12.5px] leading-relaxed text-ink-2">
+          <span className="text-ink">These credentials are shown once.</span> Copy them now. Closing this dialog clears them.
+        </p>
+      </div>
+
       <div className="rounded-md border border-line-strong bg-page p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-medium uppercase text-muted">Credentials</span>
-          <Button size="sm" variant="ghost" onClick={copyAll}>
-            {copiedField === "all" ? <Check size={13} /> : <Copy size={13} />} Copy all as env
-          </Button>
+          <div className="flex gap-1">
+            <Button size="sm" variant="ghost" onClick={() => setRevealed((r) => !r)}>
+              {revealed ? <EyeOff size={13} /> : <Eye size={13} />} {revealed ? "Hide" : "Reveal"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={copyAll}>
+              {copiedField === "all" ? <Check size={13} /> : <Copy size={13} />} Copy all as env
+            </Button>
+          </div>
         </div>
         {[
-          { label: "Access Key ID", value: result.credentials.accessKeyId },
-          { label: "Secret Access Key", value: result.credentials.secretAccessKey },
-          { label: "Session Token", value: result.credentials.sessionToken },
-        ].map(({ label, value }) => (
+          { label: "Access Key ID", value: result.credentials.accessKeyId, secret: false },
+          { label: "Secret Access Key", value: result.credentials.secretAccessKey, secret: true },
+          { label: "Session Token", value: result.credentials.sessionToken, secret: true },
+        ].map(({ label, value, secret }) => (
           <div key={label}>
             <div className="mb-0.5 flex items-center justify-between">
               <span className="text-[11px] text-muted">{label}</span>
               <button
                 onClick={() => copyField(label, value)}
+                aria-label={`Copy ${label}`}
                 className="cursor-pointer rounded p-0.5 text-muted hover:text-ink"
               >
                 {copiedField === label ? <Check size={12} /> : <Copy size={12} />}
               </button>
             </div>
             <div className="break-all rounded bg-raised px-2 py-1 font-mono text-[11.5px] text-ink-2 select-all">
-              {value}
+              {secret && !revealed ? maskSecret(value) : value}
             </div>
           </div>
         ))}

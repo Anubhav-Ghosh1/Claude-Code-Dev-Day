@@ -98,6 +98,104 @@ body {
   animation: flash-in 2.4s ease-out;
 }
 
+/* Landing illustrations */
+.flow-dash {
+  stroke-dasharray: 3 7;
+  animation: flow-dash 1.4s linear infinite;
+}
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.ttl-sweep {
+  animation: ttl-sweep 15s linear infinite;
+}
+@keyframes ttl-sweep {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: var(--ttl-c);
+  }
+}
+.chain-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chain-pulse 2.4s ease-out infinite;
+}
+@keyframes chain-pulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+.packet {
+  offset-rotate: 0deg;
+  animation: packet 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes packet {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+.scan-beam {
+  animation: scan-beam 3.2s ease-in-out infinite;
+}
+@keyframes scan-beam {
+  0% {
+    transform: translateY(-56px);
+  }
+  100% {
+    transform: translateY(256px);
+  }
+}
+.think-dot {
+  animation: think-dot 1.2s ease-in-out infinite;
+}
+@keyframes think-dot {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.sparkle-spin > path {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sparkle-spin 6s ease-in-out infinite;
+}
+@keyframes sparkle-spin {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(90deg) scale(0.85);
+  }
+}
+.live-dot {
+  animation: think-dot 2s ease-in-out infinite;
+}
+
 /* Recharts: keep chrome recessive */
 .recharts-cartesian-axis-tick-value {
   fill: var(--color-muted);

@@ -1,28 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Mode = "signin" | "register";
-type Role = "admin" | "auditor" | "viewer";
-
-const ROLES: { value: Role; label: string; description: string }[] = [
-  { value: "admin", label: "Admin", description: "Full access — manage agents, policies, sessions" },
-  { value: "auditor", label: "Auditor", description: "Read-only — view everything, export audit logs" },
-  { value: "viewer", label: "Viewer", description: "Limited — view sessions and agents only" },
-];
-
+// useSearchParams needs a Suspense boundary or the page can't be prerendered (breaks `next build`).
 export default function SignInPage() {
+  return (
+    <Suspense>
+      <SignInForm />
+    </Suspense>
+  );
+}
+
+/** Only same-site paths: never bounce a user to another origin after sign-in. */
+function safeCallback(raw: string | null) {
+  return raw && raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\") ? raw : "/dashboard";
+}
+
+function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl = safeCallback(searchParams.get("callbackUrl"));
 
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState<Role>("viewer");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -30,7 +35,6 @@ export default function SignInPage() {
     setEmail("");
     setPassword("");
     setName("");
-    setRole("viewer");
     setError("");
   };
 
@@ -73,7 +77,8 @@ export default function SignInPage() {
           email: email.trim(),
           password,
           name: name.trim(),
-          role,
+          // No role: self-registration must never choose its own role. New accounts are viewers;
+          // an admin promotes them. (The API still accepts `role` — see docs/USER_LEVEL_ACCESS.md.)
         }),
       });
 
@@ -197,34 +202,7 @@ export default function SignInPage() {
           </label>
 
           {mode === "register" && (
-            <fieldset>
-              <legend className="mb-2 text-[12px] font-medium text-ink-2">Role</legend>
-              <div className="space-y-2">
-                {ROLES.map((r) => (
-                  <label
-                    key={r.value}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-2.5 transition-colors ${
-                      role === r.value
-                        ? "border-[#9085e9]/60 bg-[#9085e9]/10"
-                        : "border-line-strong hover:border-line-strong hover:bg-surface"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="role"
-                      value={r.value}
-                      checked={role === r.value}
-                      onChange={() => setRole(r.value)}
-                      className="mt-0.5 accent-[#9085e9]"
-                    />
-                    <div>
-                      <span className="text-[13px] font-medium text-ink">{r.label}</span>
-                      <p className="mt-0.5 text-[11.5px] leading-snug text-muted">{r.description}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+            <p className="text-[11.5px] leading-snug text-muted">New accounts start as viewers. An admin can grant more access.</p>
           )}
 
           {error && (
@@ -250,8 +228,7 @@ export default function SignInPage() {
 
         {mode === "signin" && (
           <p className="mt-6 text-center text-[11px] text-muted">
-            First time? Switch to <button onClick={() => switchMode("register")} className="text-[#9085e9] hover:underline cursor-pointer">Create account</button> or run{" "}
-            <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[10.5px] text-ink-2">npm run seed:admin</code>
+            First time? Switch to <button onClick={() => switchMode("register")} className="text-[#9085e9] hover:underline cursor-pointer">Create account</button>
           </p>
         )}
 

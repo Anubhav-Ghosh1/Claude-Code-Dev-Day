@@ -1,13 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+// useSearchParams needs a Suspense boundary or the page can't be prerendered (breaks `next build`).
 export default function SignInPage() {
+  return (
+    <Suspense>
+      <SignInForm />
+    </Suspense>
+  );
+}
+
+/** Only same-site paths: never bounce a user to another origin after sign-in. */
+function safeCallback(raw: string | null) {
+  return raw && raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\") ? raw : "/dashboard";
+}
+
+function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl = safeCallback(searchParams.get("callbackUrl"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -89,10 +103,6 @@ export default function SignInPage() {
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-
-        <p className="mt-6 text-center text-[11px] text-muted">
-          First time? Run <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[10.5px] text-ink-2">npm run seed:admin</code> to create the admin account.
-        </p>
       </div>
     </div>
   );

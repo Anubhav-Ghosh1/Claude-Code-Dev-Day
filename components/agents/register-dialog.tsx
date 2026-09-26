@@ -3,17 +3,16 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { KeyRound, TriangleAlert } from "lucide-react";
-import type { Policy, RegisterAgentResult } from "@/types/dashboard";
+import type { RegisterAgentResult } from "@/types/dashboard";
 import { api } from "@/lib/api/client";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/field";
 import { CopyText } from "@/components/shared/copy-text";
-import { cn } from "@/lib/utils";
 
-const EMPTY = { name: "", description: "", team: "", environment: "staging", policyIds: [] as string[], rpm: 30, maxSessions: 5 };
+const EMPTY = { name: "", description: "", team: "", environment: "staging", rpm: 30, maxSessions: 5 };
 
-export function RegisterAgentDialog({ open, onClose, policies, onRegistered }: { open: boolean; onClose: () => void; policies: Policy[]; onRegistered: () => void }) {
+export function RegisterAgentDialog({ open, onClose, onRegistered }: { open: boolean; onClose: () => void; onRegistered: () => void }) {
   const [form, setForm] = useState(EMPTY);
   const [result, setResult] = useState<RegisterAgentResult | null>(null);
   const [saving, setSaving] = useState(false);
@@ -36,7 +35,6 @@ export function RegisterAgentDialog({ open, onClose, policies, onRegistered }: {
         name: form.name.trim(),
         description: form.description.trim(),
         metadata: { ...(form.team && { team: form.team }), environment: form.environment },
-        policyIds: form.policyIds,
         rateLimit: { maxRequestsPerMinute: form.rpm, maxActiveSessions: form.maxSessions },
       });
       setResult(res.data!);
@@ -77,28 +75,6 @@ export function RegisterAgentDialog({ open, onClose, policies, onRegistered }: {
               </Select>
             </label>
           </div>
-          <fieldset>
-            <Label hint="security-baseline always applies">Policies</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {policies.map((p) => {
-                const on = form.policyIds.includes(p.policyId);
-                return (
-                  <label key={p.policyId} className={cn("flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-[12.5px]", on ? "border-ink-2 bg-raised" : "border-line-strong hover:bg-raised/50")}>
-                    <input
-                      type="checkbox"
-                      checked={on}
-                      onChange={() => setForm({ ...form, policyIds: on ? form.policyIds.filter((x) => x !== p.policyId) : [...form.policyIds, p.policyId] })}
-                      className="mt-0.5 accent-[#9085e9]"
-                    />
-                    <span>
-                      <span className="block font-mono text-ink">{p.name}</span>
-                      <span className="block text-[11px] text-muted">{p.rules.length} rules · priority {p.priority}</span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <Label>Requests / min</Label>

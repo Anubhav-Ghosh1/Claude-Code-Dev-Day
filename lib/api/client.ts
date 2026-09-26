@@ -5,6 +5,7 @@ import type {
   ApiResponse,
   AuditLogFilters,
   AuditLogsResponse,
+  CliDeviceRequest,
   CreatePolicyInput,
   CreateSessionInput,
   DashboardSessionResult,
@@ -58,6 +59,15 @@ export const api = {
     http<ApiResponse<RegisterAgentResult>>(`/agents`, { method: "POST", body: JSON.stringify(input) }),
   setAgentStatus: (id: string, status: "suspended" | "revoked") =>
     http<ApiResponse<Agent>>(`/agents/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+
+  /** CLI sign-in approval (device flow). Endpoints are specified in docs/USER_LEVEL_ACCESS.md. */
+  cli: {
+    lookupDevice: (userCode: string) => http<ApiResponse<CliDeviceRequest>>(`/cli/device/${encodeURIComponent(userCode)}`),
+    approveDevice: (userCode: string) =>
+      http<ApiResponse<{ approved: true }>>(`/cli/device/${encodeURIComponent(userCode)}/approve`, { method: "POST" }),
+    denyDevice: (userCode: string) =>
+      http<ApiResponse<{ denied: true }>>(`/cli/device/${encodeURIComponent(userCode)}/deny`, { method: "POST" }),
+  },
 
   listPolicies: () => http<ApiResponse<Policy[]>>(`/policies${qs({ limit: 100 })}`),
   createPolicy: (input: CreatePolicyInput) =>

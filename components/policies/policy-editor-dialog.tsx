@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, ShieldCheck } from "lucide-react";
 import type { Policy, PolicyRule, CreatePolicyInput } from "@/types/dashboard";
 import { api } from "@/lib/api/client";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input, Label, Select } from "@/components/ui/field";
+import { Input, Label } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
 const EMPTY_RULE: PolicyRule = { effect: "allow", services: [""], actions: ["*"], resources: ["*"] };
@@ -54,18 +54,18 @@ export function PolicyEditorDialog({
   const [error, setError] = useState<string | null>(null);
   const [regionsText, setRegionsText] = useState("");
 
-  useEffect(() => {
-    if (open) {
-      if (policy) {
-        setForm(policyToForm(policy));
-        setRegionsText(policy.constraints.allowedRegions.join(", "));
-      } else {
-        setForm({ ...EMPTY_FORM, rules: [{ ...EMPTY_RULE }] });
-        setRegionsText("");
-      }
+  // Re-initialise the form whenever the dialog opens for a different policy (or a new one).
+  // Done during render rather than in an effect, so there's no extra render with stale values.
+  const formKey = open ? `${policy?.policyId ?? "new"}:${policy?.version ?? 0}` : null;
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  if (formKey !== loadedKey) {
+    setLoadedKey(formKey);
+    if (formKey) {
+      setForm(policy ? policyToForm(policy) : { ...EMPTY_FORM, rules: [{ ...EMPTY_RULE }] });
+      setRegionsText(policy ? policy.constraints.allowedRegions.join(", ") : "");
       setError(null);
     }
-  }, [open, policy]);
+  }
 
   const updateRule = (idx: number, patch: Partial<PolicyRule>) => {
     const rules = [...form.rules];

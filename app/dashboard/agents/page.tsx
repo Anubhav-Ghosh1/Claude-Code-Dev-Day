@@ -132,7 +132,7 @@ export default function AgentsPage() {
         </div>
       </Card>
 
-      <RegisterAgentDialog open={registerOpen} onClose={() => setRegisterOpen(false)} policies={policies ?? []} onRegistered={() => mutate()} />
+      <RegisterAgentDialog open={registerOpen} onClose={() => setRegisterOpen(false)} onRegistered={() => mutate()} />
 
       <Dialog open={!!pending} onClose={() => setPending(null)} title={pending?.status === "revoked" ? "Revoke agent?" : "Suspend agent?"}>
         {pending && (
@@ -141,7 +141,7 @@ export default function AgentsPage() {
               <span className="font-mono text-ink">{pending.agent.name}</span>{" "}
               {pending.status === "revoked"
                 ? "will be permanently blocked. Its API key stops working and it can never request credentials again."
-                : "won't be able to request new credentials until reinstated. Existing tokens still expire on their normal TTL."}
+                : "won't be able to request new credentials. Tokens it already holds still expire on their normal TTL."}
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setPending(null)}>

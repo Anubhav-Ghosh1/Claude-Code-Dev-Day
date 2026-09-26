@@ -18,7 +18,7 @@ export function SessionsTable({ sessions, loading, agentNames }: { sessions?: Se
         <thead>
           <tr className="border-b border-line text-left text-[11px] text-muted">
             <th className="py-2.5 pl-5 font-normal">Status</th>
-            <th className="py-2.5 font-normal">Session · agent</th>
+            <th className="py-2.5 font-normal">Session · agent · user</th>
             <th className="py-2.5 font-normal">Gist</th>
             <th className="py-2.5 font-normal">Permissions</th>
             <th className="w-56 py-2.5 font-normal">TTL</th>
@@ -48,7 +48,10 @@ export function SessionsTable({ sessions, loading, agentNames }: { sessions?: Se
                 </td>
                 <td className="py-3 pr-4">
                   <div className="font-mono text-[12px] text-ink">{s.sessionId.slice(0, 17)}…</div>
-                  <div className="mt-0.5 font-mono text-[11px] text-muted">{agentNames.get(s.agentId) ?? s.agentId}</div>
+                  <div className="mt-0.5 font-mono text-[11px] text-muted">
+                    {agentNames.get(s.agentId) ?? s.agentId}
+                    {s.requestedBy && <span className="font-sans"> · for {s.requestedBy.email}</span>}
+                  </div>
                 </td>
                 <td className="max-w-[380px] py-3 pr-4">
                   <div className="truncate text-ink-2" title={s.gist}>

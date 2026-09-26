@@ -9,6 +9,9 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/field";
 import { CopyText } from "@/components/shared/copy-text";
+import { CodeBlock } from "@/components/shared/code-block";
+import { curlSnippets, samplePermission } from "@/lib/agent-guide";
+import { appUrl } from "@/lib/app-url";
 
 const EMPTY = { name: "", description: "", team: "", environment: "staging", rpm: 30, maxSessions: 5 };
 
@@ -138,6 +141,12 @@ function ApiKeyReveal({ result, onDone }: { result: RegisterAgentResult; onDone:
           <dd className="mt-0.5 font-mono text-ink-2">{result.apiKeyPrefix}</dd>
         </div>
       </dl>
+      <CodeBlock
+        label="Try it: open a first session (key already filled in)"
+        code={curlSnippets(appUrl(), result, samplePermission(undefined), { apiKey: result.apiKey }).request}
+        maxHeight={180}
+      />
+      <p className="-mt-2 text-[11.5px] text-muted">The full guide and a CLAUDE.md are in this agent&apos;s row on the Agents page.</p>
       <div className="flex justify-end">
         <Button variant="primary" onClick={onDone}>
           I&apos;ve stored it — done
